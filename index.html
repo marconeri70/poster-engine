@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="it">
+  <head>
+      <meta charset="UTF-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+              <title>Poster Engine O.S.</title>
+                  <style>
+                        body { font-family: system-ui, sans-serif; padding: 20px; max-width: 600px; margin: 0 auto; background: #f4f4f5; }
+                              .control-group { background: white; padding: 15px; margin-bottom: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+                                    label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 0.9em; text-transform: uppercase; letter-spacing: 0.5px; }
+                                          input { width: 100%; padding: 10px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; font-size: 1em; }
+                                                button { width: 100%; padding: 15px; background: #000; color: #fff; border: none; font-weight: bold; cursor: pointer; border-radius: 4px; text-transform: uppercase; }
+                                                      button:active { background: #333; }
+                                                          </style>
+                                                            </head>
+                                                              <body>
+                                                                  <h1>Poster Engine</h1>
+                                                                      <div class="control-group">
+                                                                            <label>1. Carica Immagine</label>
+                                                                                  <input type="file" id="imageInput" accept="image/png, image/jpeg" />
+                                                                                      </div>
+                                                                                          <div class="control-group">
+                                                                                                <label>2. Larghezza Target (mm)</label>
+                                                                                                      <input type="number" id="targetWidth" value="1000" />
+                                                                                                          </div>
+                                                                                                              <div class="control-group">
+                                                                                                                    <label>3. Altezza Target (mm) [Deformerà l'immagine]</label>
+                                                                                                                          <input type="number" id="targetHeight" value="1000" />
+                                                                                                                              </div>
+                                                                                                                                  <div class="control-group">
+                                                                                                                                        <label>4. Sovrapposizione Fogli (mm)</label>
+                                                                                                                                              <input type="number" id="overlap" value="15" />
+                                                                                                                                                  </div>
+                                                                                                                                                      <div class="control-group">
+                                                                                                                                                            <label>5. Margine Sicurezza Stampante (mm)</label>
+                                                                                                                                                                  <input type="number" id="margin" value="5" />
+                                                                                                                                                                      </div>
+                                                                                                                                                                          <button id="generateBtn">CALCOLA MATRICE</button>
+
+                                                                                                                                                                              <script type="module" src="/src/main.ts"></script>
+                                                                                                                                                                                </body>
+                                                                                                                                                                                </html>
+                                                                                                                                                                                
