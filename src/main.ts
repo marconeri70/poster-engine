@@ -1,13 +1,6 @@
 import { calculateGrid, type PosterConfig } from './GridCalculator';
 import { generatePdf } from './PdfBuilder';
 
-// Registrazione Service Worker per installazione App
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/poster-engine/sw.js').catch(() => {});
-    });
-}
-
 const imageInput = document.getElementById('imageInput') as HTMLInputElement;
 const targetWidthInput = document.getElementById('targetWidth') as HTMLInputElement;
 const targetHeightInput = document.getElementById('targetHeight') as HTMLInputElement;
@@ -24,16 +17,16 @@ let isInteracting = false;
 let currentHandle: string | null = null;
 let start = { mx: 0, my: 0, ix: 0, iy: 0, iw: 0, ih: 0 };
 let currentFile: File | null = null;
-let dynamicScale = 0.4; // Verrà ricalcolato in base allo schermo
+let dynamicScale = 0.5;
 
 function syncUI() {
     const wMm = Number(targetWidthInput.value);
     const hMm = Number(targetHeightInput.value);
     
-    // CALCOLO SCALA DINAMICA: Adatta la cornice allo spazio disponibile
-    const vWidth = viewport.clientWidth - 40;
-    const vHeight = viewport.clientHeight - 40;
-    dynamicScale = Math.min(vWidth / wMm, vHeight / hMm);
+    // Ricalcolo scala per riempire lo schermo
+    const vW = viewport.clientWidth - 20;
+    const vH = viewport.clientHeight - 20;
+    dynamicScale = Math.min(vW / wMm, vH / hMm);
 
     posterFrame.style.width = (wMm * dynamicScale).toString() + "px";
     posterFrame.style.height = (hMm * dynamicScale).toString() + "px";
@@ -48,7 +41,9 @@ function syncUI() {
     const grid = calculateGrid(config);
     gridOverlay.style.gridTemplateColumns = `repeat(${Math.max(...grid.map(g => g.col)) + 1}, 1fr)`;
     gridOverlay.innerHTML = '';
-    grid.forEach((_, i) => {
+    
+    // CORREZIONE: Rimosso parametro 'i' non utilizzato
+    grid.forEach(() => {
         const line = document.createElement('div');
         line.className = 'grid-line';
         gridOverlay.appendChild(line);
@@ -69,6 +64,7 @@ const onStart = (e: MouseEvent | TouchEvent) => {
     isInteracting = true;
     currentHandle = target.getAttribute('data-h');
     start = { mx: clientX, my: clientY, ix: mmState.x, iy: mmState.y, iw: mmState.w, ih: mmState.h };
+    e.preventDefault();
 };
 
 const onMove = (e: MouseEvent | TouchEvent) => {
@@ -91,12 +87,12 @@ const onMove = (e: MouseEvent | TouchEvent) => {
 };
 
 imageWrapper.addEventListener('mousedown', onStart);
-imageWrapper.addEventListener('touchstart', onStart);
+imageWrapper.addEventListener('touchstart', onStart, {passive: false});
 window.addEventListener('mousemove', onMove);
-window.addEventListener('touchmove', onMove);
+window.addEventListener('touchmove', onMove, {passive: false});
 window.addEventListener('mouseup', () => isInteracting = false);
 window.addEventListener('touchend', () => isInteracting = false);
-window.addEventListener('resize', syncUI); // Ricalcola se ruoti il telefono
+window.addEventListener('resize', syncUI);
 
 imageInput.addEventListener('change', (e) => {
     const file = (e.target as HTMLInputElement).files?.[0];
@@ -119,7 +115,7 @@ imageInput.addEventListener('change', (e) => {
 generateBtn.addEventListener('click', async () => {
     if (!currentFile || !movableImage.src) return;
     generateBtn.disabled = true;
-    generateBtn.innerText = "CALCOLO PDF...";
+    generateBtn.innerText = "COSTRUZIONE PDF...";
     const config = {
         imageWidthPx: movableImage.naturalWidth, imageHeightPx: movableImage.naturalHeight,
         targetWidthMm: Number(targetWidthInput.value), targetHeightMm: Number(targetHeightInput.value),
@@ -130,7 +126,7 @@ generateBtn.addEventListener('click', async () => {
     const blob = new Blob([pdfBytes as any], { type: 'application/pdf' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = 'Poster_Pro_Print.pdf'; a.click();
+    a.href = url; a.download = 'Poster_Stampa_Distorzione.pdf'; a.click();
     generateBtn.disabled = false;
-    generateBtn.innerText = "Scarica File di Stampa";
+    generateBtn.innerText = "Scarica PDF Alta Qualità";
 });
