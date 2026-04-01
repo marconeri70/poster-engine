@@ -1,6 +1,13 @@
 import { calculateGrid, type PosterConfig } from './GridCalculator';
 import { generatePdf } from './PdfBuilder';
 
+// Registrazione Service Worker per installazione App
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/poster-engine/sw.js').catch(() => {});
+    });
+}
+
 const imageInput = document.getElementById('imageInput') as HTMLInputElement;
 const targetWidthInput = document.getElementById('targetWidth') as HTMLInputElement;
 const targetHeightInput = document.getElementById('targetHeight') as HTMLInputElement;
@@ -10,19 +17,26 @@ const posterFrame = document.getElementById('posterFrame') as HTMLDivElement;
 const imageWrapper = document.getElementById('imageWrapper') as HTMLDivElement;
 const movableImage = document.getElementById('movableImage') as HTMLImageElement;
 const gridOverlay = document.getElementById('gridOverlay') as HTMLDivElement;
+const viewport = document.getElementById('viewport') as HTMLDivElement;
 
 let mmState = { x: 0, y: 0, w: 1000, h: 1000 };
 let isInteracting = false;
 let currentHandle: string | null = null;
 let start = { mx: 0, my: 0, ix: 0, iy: 0, iw: 0, ih: 0 };
 let currentFile: File | null = null;
-const VIEW_SCALE = 0.4;
+let dynamicScale = 0.4; // Verrà ricalcolato in base allo schermo
 
 function syncUI() {
     const wMm = Number(targetWidthInput.value);
     const hMm = Number(targetHeightInput.value);
-    posterFrame.style.width = (wMm * VIEW_SCALE).toString() + "px";
-    posterFrame.style.height = (hMm * VIEW_SCALE).toString() + "px";
+    
+    // CALCOLO SCALA DINAMICA: Adatta la cornice allo spazio disponibile
+    const vWidth = viewport.clientWidth - 40;
+    const vHeight = viewport.clientHeight - 40;
+    dynamicScale = Math.min(vWidth / wMm, vHeight / hMm);
+
+    posterFrame.style.width = (wMm * dynamicScale).toString() + "px";
+    posterFrame.style.height = (hMm * dynamicScale).toString() + "px";
 
     const config: PosterConfig = {
         imageWidthPx: movableImage.naturalWidth || 100,
@@ -37,16 +51,15 @@ function syncUI() {
     grid.forEach((_, i) => {
         const line = document.createElement('div');
         line.className = 'grid-line';
-        line.setAttribute('data-id', (i + 1).toString());
         gridOverlay.appendChild(line);
     });
     updateVisuals();
 }
 
 function updateVisuals() {
-    imageWrapper.style.transform = `translate(${mmState.x * VIEW_SCALE}px, ${mmState.y * VIEW_SCALE}px)`;
-    imageWrapper.style.width = (mmState.w * VIEW_SCALE).toString() + "px";
-    imageWrapper.style.height = (mmState.h * VIEW_SCALE).toString() + "px";
+    imageWrapper.style.transform = `translate(${mmState.x * dynamicScale}px, ${mmState.y * dynamicScale}px)`;
+    imageWrapper.style.width = (mmState.w * dynamicScale).toString() + "px";
+    imageWrapper.style.height = (mmState.h * dynamicScale).toString() + "px";
 }
 
 const onStart = (e: MouseEvent | TouchEvent) => {
@@ -56,15 +69,14 @@ const onStart = (e: MouseEvent | TouchEvent) => {
     isInteracting = true;
     currentHandle = target.getAttribute('data-h');
     start = { mx: clientX, my: clientY, ix: mmState.x, iy: mmState.y, iw: mmState.w, ih: mmState.h };
-    e.preventDefault();
 };
 
 const onMove = (e: MouseEvent | TouchEvent) => {
     if (!isInteracting) return;
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-    const dx = (clientX - start.mx) / VIEW_SCALE;
-    const dy = (clientY - start.my) / VIEW_SCALE;
+    const dx = (clientX - start.mx) / dynamicScale;
+    const dy = (clientY - start.my) / dynamicScale;
 
     if (!currentHandle) {
         mmState.x = start.ix + dx;
@@ -84,6 +96,7 @@ window.addEventListener('mousemove', onMove);
 window.addEventListener('touchmove', onMove);
 window.addEventListener('mouseup', () => isInteracting = false);
 window.addEventListener('touchend', () => isInteracting = false);
+window.addEventListener('resize', syncUI); // Ricalcola se ruoti il telefono
 
 imageInput.addEventListener('change', (e) => {
     const file = (e.target as HTMLInputElement).files?.[0];
@@ -106,7 +119,7 @@ imageInput.addEventListener('change', (e) => {
 generateBtn.addEventListener('click', async () => {
     if (!currentFile || !movableImage.src) return;
     generateBtn.disabled = true;
-    generateBtn.innerText = "COSTRUZIONE...";
+    generateBtn.innerText = "CALCOLO PDF...";
     const config = {
         imageWidthPx: movableImage.naturalWidth, imageHeightPx: movableImage.naturalHeight,
         targetWidthMm: Number(targetWidthInput.value), targetHeightMm: Number(targetHeightInput.value),
@@ -117,7 +130,7 @@ generateBtn.addEventListener('click', async () => {
     const blob = new Blob([pdfBytes as any], { type: 'application/pdf' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = 'Poster_Distorzione.pdf'; a.click();
+    a.href = url; a.download = 'Poster_Pro_Print.pdf'; a.click();
     generateBtn.disabled = false;
-    generateBtn.innerText = "Scarica PDF Distorto";
+    generateBtn.innerText = "Scarica File di Stampa";
 });
