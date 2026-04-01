@@ -95,8 +95,8 @@ export async function generatePdf(
     // 4. Indicatori ai quattro angoli (Crocini semplificati)
     const crossSize = 10;
     const drawCross = (x: number, y: number) => {
-      page.drawLine({ start: { x: x-crossSize, y }, end: { x: x+crossSize, y }, color: rgb(0,0,0), borderWidth: 0.2 });
-      page.drawLine({ start: { x, y: y-crossSize }, end: { x, y: y+crossSize }, color: rgb(0,0,0), borderWidth: 0.2 });
+      page.drawLine({ start: { x: x-crossSize, y }, end: { x: x+crossSize, y }, color: rgb(0,0,0), thickness: 0.2 });
+      page.drawLine({ start: { x, y: y-crossSize }, end: { x, y: y+crossSize }, color: rgb(0,0,0), thickness: 0.2 });
     };
     
     drawCross(offsetX_PT, offsetY_PT); // Angolo Basso-SX
