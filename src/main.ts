@@ -7,24 +7,24 @@ const targetHeightInput = document.getElementById('targetHeight') as HTMLInputEl
 const overlapInput = document.getElementById('overlap') as HTMLInputElement;
 const generateBtn = document.getElementById('generateBtn') as HTMLButtonElement;
 const posterFrame = document.getElementById('posterFrame') as HTMLDivElement;
+const imageWrapper = document.getElementById('imageWrapper') as HTMLDivElement;
 const movableImage = document.getElementById('movableImage') as HTMLImageElement;
 const gridOverlay = document.getElementById('gridOverlay') as HTMLDivElement;
-const scaleHandle = document.getElementById('scaleHandle') as HTMLDivElement;
 
-let imgState = { x: 0, y: 0, scale: 0.3 };
-let isDragging = false;
-let isScaling = false;
-let startX = 0, startY = 0;
-let startScale = 0;
+let mmState = { x: 0, y: 0, width: 0, height: 0 }; // Dimensioni reali in millimetri
+let isInteracting = false;
+let currentHandle: string | null = null;
+let startPos = { mx: 0, my: 0, ix: 0, iy: 0, iw: 0, ih: 0 }; // Memoria dello stato iniziale al tocco
 let currentFile: File | null = null;
-const VIEW_SCALE = 0.4; // 1mm = 0.4px per l'anteprima
+const VIEW_SCALE = 0.5; // Scala visuale 1px = 2mm per far stare tutto a schermo
 
-function syncUI() {
+// Sincronizza Cornice e Griglia Fissa (Basata sulle misure pareti inserite)
+function syncFrameAndGrid() {
     const wMm = Number(targetWidthInput.value);
     const hMm = Number(targetHeightInput.value);
 
-    posterFrame.style.width = (wMm * VIEW_SCALE).toString() + "px";
-    posterFrame.style.height = (hMm * VIEW_SCALE).toString() + "px";
+    posterFrame.style.width = `${wMm * VIEW_SCALE}px`;
+    posterFrame.style.height = `${hMm * VIEW_SCALE}px`;
 
     const config: PosterConfig = {
         imageWidthPx: movableImage.naturalWidth,
@@ -36,64 +36,88 @@ function syncUI() {
     };
 
     const grid = calculateGrid(config);
-    const cols = Math.max(...grid.map(g => g.col)) + 1;
+    const cols = Math.max(...grid.map(p => p.col)) + 1;
     gridOverlay.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
     gridOverlay.innerHTML = '';
     grid.forEach((_, i) => {
         const line = document.createElement('div');
         line.className = 'grid-line';
-        line.setAttribute('data-id', (i + 1).toString());
+        line.setAttribute('data-id', i + 1);
         gridOverlay.appendChild(line);
     });
 }
 
-const updateTransform = () => {
-    movableImage.style.transform = `translate(${imgState.x}px, ${imgState.y}px) scale(${imgState.scale})`;
-};
+// Aggiorna l'anteprima visiva distorta dell'immagine
+function updateImagePreview() {
+    imageWrapper.style.transform = `translate(${mmState.x * VIEW_SCALE}px, ${mmState.y * VIEW_SCALE}px)`;
+    imageWrapper.style.width = `${mmState.width * VIEW_SCALE}px`;
+    imageWrapper.style.height = `${mmState.height * VIEW_SCALE}px`;
+}
 
-// Eventi Mouse/Touch
-const onStart = (e: MouseEvent | TouchEvent, type: 'drag' | 'scale') => {
+// GESTIONE MANIPOLAZIONE VETTORIALE (Distorzione Non-Proporzionale)
+const startInteraction = (e: MouseEvent | TouchEvent) => {
+    const target = e.target as HTMLElement;
+    isInteracting = true;
+    currentHandle = target.getAttribute('data-handle'); // TL, TM, TR, ML, MR, BL, BM, BR o null (immagine)
+
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-    if (type === 'drag') {
-        isDragging = true;
-        startX = clientX - imgState.x;
-        startY = clientY - imgState.y;
-    } else {
-        isScaling = true;
-        startX = clientX;
-        startScale = imgState.scale;
-    }
+
+    startPos = {
+        mx: clientX, my: clientY, // Mouse
+        ix: mmState.x, iy: mmState.y, // Immagine mm
+        iw: mmState.width, ih: mmState.height // Immagine mm
+    };
+    e.preventDefault();
 };
 
-movableImage.addEventListener('mousedown', (e) => onStart(e, 'drag'));
-movableImage.addEventListener('touchstart', (e) => onStart(e, 'drag'));
-scaleHandle.addEventListener('mousedown', (e) => onStart(e, 'scale'));
-scaleHandle.addEventListener('touchstart', (e) => onStart(e, 'scale'));
+const doInteraction = (e: MouseEvent | TouchEvent) => {
+    if (!isInteracting || !movableImage.src) return;
 
-window.addEventListener('mousemove', (e) => {
-    if (isDragging) {
-        imgState.x = e.clientX - startX;
-        imgState.y = e.clientY - startY;
-    } else if (isScaling) {
-        imgState.scale = Math.max(0.05, startScale + (e.clientX - startX) * 0.002);
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+
+    // Delta dello spostamento in mm reali (dividiamo per VIEW_SCALE)
+    const dXmm = (clientX - startPos.mx) / VIEW_SCALE;
+    const dYmm = (clientY - startPos.my) / VIEW_SCALE;
+
+    // LOGICA DI DISTORSIONE CHIRURGICA (NON PROPORZIONALE)
+    if (!currentHandle) {
+        // TRASCINAMENTO (Spostamento X,Y)
+        mmState.x = startPos.ix + dXmm;
+        mmState.y = startPos.iy + dYmm;
+    } else {
+        // RESIZE / DISTORSIONE
+        const h = currentHandle;
+        
+        // Asse Orizzontale (width, x)
+        if (h.includes('r')) mmState.width = Math.max(10, startPos.iw + dXmm); // Trascina lato destro
+        if (h.includes('l')) { // Trascina lato sinistro
+            mmState.width = Math.max(10, startPos.iw - dXmm);
+            mmState.x = startPos.ix + dXmm; // Sposta X per tenere fermo l'altro lato
+        }
+
+        // Asse Verticale (height, y)
+        if (h.includes('b')) mmState.height = Math.max(10, startPos.ih + dYmm); // Trascina lato basso
+        if (h.includes('t')) { // Trascina lato alto
+            mmState.height = Math.max(10, startPos.ih - dYmm);
+            mmState.y = startPos.iy + dYmm; // Sposta Y per tenere fermo l'altro lato
+        }
     }
-    if (isDragging || isScaling) updateTransform();
-});
+    updateImagePreview();
+};
 
-window.addEventListener('touchmove', (e) => {
-    if (isDragging) {
-        imgState.x = e.touches[0].clientX - startX;
-        imgState.y = e.touches[0].clientY - startY;
-    } else if (isScaling) {
-        imgState.scale = Math.max(0.05, startScale + (e.touches[0].clientX - startX) * 0.002);
-    }
-    if (isDragging || isScaling) updateTransform();
-});
+const stopInteraction = () => { isInteracting = false; currentHandle = null; };
 
-window.addEventListener('mouseup', () => { isDragging = false; isScaling = false; });
-window.addEventListener('touchend', () => { isDragging = false; isScaling = false; });
+// Aggancio eventi
+imageWrapper.addEventListener('mousedown', startInteraction);
+imageWrapper.addEventListener('touchstart', startInteraction);
+window.addEventListener('mousemove', doInteraction);
+window.addEventListener('touchmove', doInteraction);
+window.addEventListener('mouseup', stopInteraction);
+window.addEventListener('touchend', stopInteraction);
 
+// LISTENERS STANDARD (UI input)
 imageInput.addEventListener('change', (e) => {
     const file = (e.target as HTMLInputElement).files?.[0];
     if (!file) return;
@@ -101,21 +125,29 @@ imageInput.addEventListener('change', (e) => {
     const reader = new FileReader();
     reader.onload = (ev) => {
         movableImage.src = ev.target?.result as string;
-        movableImage.style.display = 'block';
-        scaleHandle.style.display = 'block';
-        movableImage.onload = syncUI;
+        imageWrapper.style.display = 'block';
+        movableImage.onload = () => {
+            syncFrameAndGrid();
+            // Inizializza l'immagine che copre l'intera cornice
+            mmState = { x: 0, y: 0, width: Number(targetWidthInput.value), height: Number(targetHeightInput.value) };
+            updateImagePreview();
+        };
     };
     reader.readAsDataURL(file);
 });
 
-[targetWidthInput, targetHeightInput, overlapInput].forEach(el => el.addEventListener('input', syncUI));
+[targetWidthInput, targetHeightInput, overlapInput].forEach(el => el.addEventListener('input', () => {
+    syncFrameAndGrid();
+    if (movableImage.src) updateImagePreview();
+}));
 
+// GENERAZIONE PDF CHIRURGICA
 generateBtn.addEventListener('click', async () => {
     if (!currentFile || !movableImage.src) return;
     generateBtn.disabled = true;
-    generateBtn.innerText = "COSTRUZIONE PDF...";
+    generateBtn.innerText = "CHIRURGIA IN CORSO...";
     
-    const config: PosterConfig = {
+    const config = {
         imageWidthPx: movableImage.naturalWidth,
         imageHeightPx: movableImage.naturalHeight,
         targetWidthMm: Number(targetWidthInput.value),
@@ -125,15 +157,22 @@ generateBtn.addEventListener('click', async () => {
     };
 
     const grid = calculateGrid(config);
-    const pdfBytes = await generatePdf(currentFile, config, grid, { ...imgState, viewScale: VIEW_SCALE });
+    
+    // Passiamo le misure millimetriche distorte esatte
+    const pdfBytes = await generatePdf(currentFile, config, grid, {
+        mmX: mmState.x,
+        mmY: mmState.y,
+        mmWidth: mmState.width,
+        mmHeight: mmState.height
+    });
 
     const blob = new Blob([pdfBytes as any], { type: 'application/pdf' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'Poster_Ritagliato.pdf';
+    a.download = `Poster_Distorto_${mmState.width.toFixed(0)}x${mmState.height.toFixed(0)}mm.pdf`;
     a.click();
     
     generateBtn.disabled = false;
-    generateBtn.innerText = "Scarica PDF Ritagliato";
+    generateBtn.innerText = "Scarica PDF Distorto";
 });
