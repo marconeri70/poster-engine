@@ -3,15 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Poster Engine Pro v4 (Distorzione)</title>
+    <title>Poster Engine Pro v4</title>
     <style>
-        :root { --accent: #00ff88; --bg: #0a0a0a; --card: #1a1a1a; --handle: white; }
+        :root { --accent: #00ff88; --bg: #0a0a0a; --card: #1a1a1a; }
         body { font-family: 'Inter', sans-serif; background: var(--bg); color: white; margin: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
         
-        .sidebar { padding: 20px; background: var(--card); z-index: 200; box-shadow: 0 0 20px rgba(0,0,0,0.5); }
+        .sidebar { padding: 20px; background: var(--card); z-index: 100; box-shadow: 0 0 20px rgba(0,0,0,0.5); }
         @media (min-width: 768px) { body { flex-direction: row; } .sidebar { width: 320px; height: 100vh; } }
         
-        h1 { font-size: 1.2rem; color: var(--accent); margin: 0 0 20px 0; text-align: center; font-weight: 800; letter-spacing: -1px; }
+        h1 { font-size: 1.2rem; color: var(--accent); margin: 0 0 20px 0; text-align: center; font-weight: 800; }
         .control-group { margin-bottom: 15px; }
         label { display: block; font-size: 10px; text-transform: uppercase; color: #888; margin-bottom: 5px; }
         input { width: 100%; background: #2a2a2a; border: 1px solid #3a3a3a; padding: 10px; color: white; border-radius: 4px; box-sizing: border-box; }
@@ -19,53 +19,42 @@
         #generateBtn { width: 100%; padding: 15px; background: var(--accent); color: black; border: none; font-weight: 800; border-radius: 4px; cursor: pointer; text-transform: uppercase; margin-top: 10px; }
         #generateBtn:disabled { background: #444; cursor: not-allowed; }
 
-        .main-view { flex-grow: 1; position: relative; background: radial-gradient(#222 1px, transparent 1px); background-size: 30px 30px; display: flex; align-items: center; justify-content: center; touch-action: none; overflow: hidden; }
+        .main-view { flex-grow: 1; position: relative; background: radial-gradient(#222 1px, transparent 1px); background-size: 20px 20px; overflow: hidden; display: flex; align-items: center; justify-content: center; touch-action: none; }
         
-        /* La Cornice Fissa (Il Muro) */
-        #posterFrame { 
-            position: relative; border: 2px solid var(--accent); background: rgba(0,0,0,0.5); overflow: hidden; box-shadow: 0 0 50px rgba(0,0,0,0.8);
-        }
+        #posterFrame { position: relative; border: 2px solid var(--accent); background: #000; overflow: hidden; }
 
-        /* Il Contenitore che viene mosso e distorto */
-        #imageWrapper { position: absolute; top: 0; left: 0; transform-origin: top left; display: none; }
-        #movableImage { width: 100%; height: 100%; object-fit: fill; /* Forza l'immagine a riempire lo spazio distorcendosi */ user-select: none; }
+        #imageWrapper { position: absolute; top: 0; left: 0; cursor: move; }
+        #movableImage { width: 100%; height: 100%; object-fit: fill; user-select: none; pointer-events: none; }
 
-        /* Le 8 Maniglie Vettoriali */
-        .handle { 
-            position: absolute; width: 14px; height: 14px; background: var(--handle); border: 2px solid var(--accent); border-radius: 50%; z-index: 100; box-shadow: 0 0 10px var(--accent); 
-        }
-        /* Posizionamento maniglie */
-        .handle.tl { top: -7px; left: -7px; cursor: nw-resize; }
-        .handle.tm { top: -7px; left: 50%; transform: translateX(-50%); cursor: n-resize; }
-        .handle.tr { top: -7px; right: -7px; cursor: ne-resize; }
-        .handle.ml { top: 50%; left: -7px; transform: translateY(-50%); cursor: w-resize; }
-        .handle.mr { top: 50%; right: -7px; transform: translateY(-50%); cursor: e-resize; }
-        .handle.bl { bottom: -7px; left: -7px; cursor: sw-resize; }
-        .handle.bm { bottom: -7px; left: 50%; transform: translateX(-50%); cursor: s-resize; }
-        .handle.br { bottom: -7px; right: -7px; cursor: se-resize; }
+        /* Le 8 Maniglie */
+        .handle { position: absolute; width: 16px; height: 16px; background: white; border: 2px solid var(--accent); border-radius: 50%; z-index: 100; }
+        .handle.tl { top: -8px; left: -8px; cursor: nw-resize; }
+        .handle.tm { top: -8px; left: 50%; transform: translateX(-50%); cursor: n-resize; }
+        .handle.tr { top: -8px; right: -8px; cursor: ne-resize; }
+        .handle.ml { top: 50%; left: -8px; transform: translateY(-50%); cursor: w-resize; }
+        .handle.mr { top: 50%; right: -8px; transform: translateY(-50%); cursor: e-resize; }
+        .handle.bl { bottom: -8px; left: -8px; cursor: sw-resize; }
+        .handle.bm { bottom: -8px; left: 50%; transform: translateX(-50%); cursor: s-resize; }
+        .handle.br { bottom: -8px; right: -8px; cursor: se-resize; }
 
-        /* Griglia Fogli (Sempre in primo piano) */
         #gridOverlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: grid; pointer-events: none; z-index: 50; }
-        .grid-line { border: 1px solid rgba(255,255,255,0.15); position: relative; box-sizing: border-box; }
-        .grid-line::after { content: attr(data-id); position: absolute; top: 2px; left: 2px; font-size: 9px; color: rgba(255,255,255,0.3); }
-
-        p.instr { font-size: 11px; color: #aaa; margin-top: 15px; border-top: 1px solid #333; padding-top: 15px; }
-        b. neon { color: var(--accent); }
+        .grid-line { border: 1px solid rgba(0, 255, 136, 0.2); position: relative; box-sizing: border-box; }
+        .grid-line::after { content: attr(data-id); position: absolute; top: 2px; left: 2px; font-size: 9px; color: var(--accent); background: rgba(0,0,0,0.5); padding: 1px 3px; }
     </style>
 </head>
 <body>
     <div class="sidebar">
         <h1>POSTER PRO v4</h1>
         <div class="control-group">
-            <label>1. Carica la tua Foto</label>
+            <label>1. Carica Foto</label>
             <input type="file" id="imageInput" accept="image/*">
         </div>
         <div class="control-group">
-            <label>2. Larghezza Parete (mm)</label>
+            <label>2. Larghezza Superficie (mm)</label>
             <input type="number" id="targetWidth" value="1000">
         </div>
         <div class="control-group">
-            <label>3. Altezza Parete (mm)</label>
+            <label>3. Altezza Superficie (mm)</label>
             <input type="number" id="targetHeight" value="1000">
         </div>
         <div class="control-group">
@@ -73,23 +62,23 @@
             <input type="number" id="overlap" value="15">
         </div>
         <button id="generateBtn">Scarica PDF Distorto</button>
-        <p class="instr">
-            <b>Chirurgia Estetica:</b> Trascina le <b class="neon">maniglie bianche</b> sui bordi o sugli angoli della foto. Puoi allungarla e distorcerla per adattarla perfettamente alla cornice verde, millimetro per millimetro.
+        <p style="font-size: 10px; color: #888; margin-top: 15px;">
+            <b>Istruzioni:</b> Trascina le maniglie bianche sui lati e sugli angoli per distorcere l'immagine e adattarla alla cornice verde.
         </p>
     </div>
     
     <div class="main-view">
         <div id="posterFrame">
-            <div id="imageWrapper">
+            <div id="imageWrapper" style="display:none;">
                 <img id="movableImage">
-                <div class="handle tl" data-handle="tl"></div>
-                <div class="handle tm" data-handle="tm"></div>
-                <div class="handle tr" data-handle="tr"></div>
-                <div class="handle ml" data-handle="ml"></div>
-                <div class="handle mr" data-handle="mr"></div>
-                <div class="handle bl" data-handle="bl"></div>
-                <div class="handle bm" data-handle="bm"></div>
-                <div class="handle br" data-handle="br"></div>
+                <div class="handle tl" data-h="tl"></div>
+                <div class="handle tm" data-h="tm"></div>
+                <div class="handle tr" data-h="tr"></div>
+                <div class="handle ml" data-h="ml"></div>
+                <div class="handle mr" data-h="mr"></div>
+                <div class="handle bl" data-h="bl"></div>
+                <div class="handle bm" data-h="bm"></div>
+                <div class="handle br" data-h="br"></div>
             </div>
             <div id="gridOverlay"></div>
         </div>
