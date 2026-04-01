@@ -1,43 +1,61 @@
 <!DOCTYPE html>
 <html lang="it">
-  <head>
-      <meta charset="UTF-8" />
-          <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-              <title>Poster Engine O.S.</title>
-                  <style>
-                        body { font-family: system-ui, sans-serif; padding: 20px; max-width: 600px; margin: 0 auto; background: #f4f4f5; }
-                              .control-group { background: white; padding: 15px; margin-bottom: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-                                    label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 0.9em; text-transform: uppercase; letter-spacing: 0.5px; }
-                                          input { width: 100%; padding: 10px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; font-size: 1em; }
-                                                button { width: 100%; padding: 15px; background: #000; color: #fff; border: none; font-weight: bold; cursor: pointer; border-radius: 4px; text-transform: uppercase; }
-                                                      button:active { background: #333; }
-                                                          </style>
-                                                            </head>
-                                                              <body>
-                                                                  <h1>Poster Engine</h1>
-                                                                      <div class="control-group">
-                                                                            <label>1. Carica Immagine</label>
-                                                                                  <input type="file" id="imageInput" accept="image/png, image/jpeg" />
-                                                                                      </div>
-                                                                                          <div class="control-group">
-                                                                                                <label>2. Larghezza Target (mm)</label>
-                                                                                                      <input type="number" id="targetWidth" value="1000" />
-                                                                                                          </div>
-                                                                                                              <div class="control-group">
-                                                                                                                    <label>3. Altezza Target (mm) [Deformerà l'immagine]</label>
-                                                                                                                          <input type="number" id="targetHeight" value="1000" />
-                                                                                                                              </div>
-                                                                                                                                  <div class="control-group">
-                                                                                                                                        <label>4. Sovrapposizione Fogli (mm)</label>
-                                                                                                                                              <input type="number" id="overlap" value="15" />
-                                                                                                                                                  </div>
-                                                                                                                                                      <div class="control-group">
-                                                                                                                                                            <label>5. Margine Sicurezza Stampante (mm)</label>
-                                                                                                                                                                  <input type="number" id="margin" value="5" />
-                                                                                                                                                                      </div>
-                                                                                                                                                                          <button id="generateBtn">CALCOLA MATRICE</button>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Poster Engine Pro</title>
+    <style>
+        :root { --accent: #00ff88; --bg: #0a0a0a; --card: #1a1a1a; }
+        body { font-family: 'Inter', sans-serif; background: var(--bg); color: white; margin: 0; display: flex; flex-direction: column; min-height: 100vh; }
+        .sidebar { padding: 30px; background: var(--card); box-shadow: 2px 0 20px rgba(0,0,0,0.5); width: 100%; box-sizing: border-box; }
+        @media (min-width: 768px) { body { flex-direction: row; } .sidebar { width: 350px; height: 100vh; overflow-y: auto; } }
+        
+        h1 { font-size: 1.5rem; color: var(--accent); letter-spacing: -1px; margin-bottom: 30px; }
+        .control-group { margin-bottom: 20px; }
+        label { display: block; font-size: 0.75rem; text-transform: uppercase; color: #888; margin-bottom: 8px; }
+        input { width: 100%; background: #2a2a2a; border: 1px solid #3a3a3a; padding: 12px; color: white; border-radius: 6px; outline: none; }
+        input:focus { border-color: var(--accent); }
+        
+        #generateBtn { width: 100%; padding: 15px; background: var(--accent); color: black; border: none; font-weight: 800; border-radius: 6px; cursor: pointer; transition: transform 0.2s; text-transform: uppercase; }
+        #generateBtn:active { transform: scale(0.98); }
 
-                                                                                                                                                                              <script type="module" src="/src/main.ts"></script>
-                                                                                                                                                                                </body>
-                                                                                                                                                                                </html>
-                                                                                                                                                                                
+        .main-view { flex-grow: 1; padding: 40px; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: auto; }
+        #previewContainer { 
+            display: grid; gap: 4px; background: #222; padding: 10px; border-radius: 8px; 
+            box-shadow: 0 30px 60px rgba(0,0,0,0.8); max-width: 90vw; max-height: 70vh;
+        }
+        .preview-tile { background-size: cover; border: 1px solid rgba(0,255,136,0.2); position: relative; }
+        .preview-tile::after { 
+            content: attr(data-coord); position: absolute; bottom: 2px; right: 2px; 
+            font-size: 8px; color: var(--accent); background: rgba(0,0,0,0.6); padding: 2px;
+        }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <h1>POSTER ENGINE <small>PRO</small></h1>
+        <div class="control-group">
+            <label>Upload Image</label>
+            <input type="file" id="imageInput" accept="image/*">
+        </div>
+        <div class="control-group">
+            <label>Width (mm)</label>
+            <input type="number" id="targetWidth" value="800">
+        </div>
+        <div class="control-group">
+            <label>Height (mm)</label>
+            <input type="number" id="targetHeight" value="1200">
+        </div>
+        <div class="control-group">
+            <label>Overlap (mm)</label>
+            <input type="number" id="overlap" value="10">
+        </div>
+        <button id="generateBtn">Build & Download PDF</button>
+    </div>
+    <div class="main-view">
+        <div id="previewContainer">
+            </div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
