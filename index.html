@@ -3,62 +3,99 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Poster Engine Pro v2</title>
+    <title>Poster Engine Pro v3</title>
     <style>
-        :root { --accent: #00ff88; --bg: #0a0a0a; --card: #1a1a1a; --danger: #ff4444; --info: #4444ff; }
-        body { font-family: 'Inter', sans-serif; background: var(--bg); color: white; margin: 0; display: flex; flex-direction: column; min-height: 100vh; overflow: hidden; }
+        :root { --accent: #00ff88; --bg: #0a0a0a; --card: #1a1a1a; }
+        body { font-family: 'Inter', sans-serif; background: var(--bg); color: white; margin: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
         
-        .sidebar { padding: 20px; background: var(--card); z-index: 10; box-shadow: 0 0 20px rgba(0,0,0,0.5); }
+        .sidebar { padding: 20px; background: var(--card); z-index: 100; box-shadow: 0 0 20px rgba(0,0,0,0.5); }
         @media (min-width: 768px) { body { flex-direction: row; } .sidebar { width: 320px; height: 100vh; } }
         
-        h1 { font-size: 1.2rem; color: var(--accent); margin: 0 0 20px 0; }
+        h1 { font-size: 1.2rem; color: var(--accent); margin: 0 0 20px 0; text-align: center; }
         .control-group { margin-bottom: 15px; }
         label { display: block; font-size: 10px; text-transform: uppercase; color: #888; margin-bottom: 5px; }
         input { width: 100%; background: #2a2a2a; border: 1px solid #3a3a3a; padding: 10px; color: white; border-radius: 4px; box-sizing: border-box; }
         
-        #generateBtn { width: 100%; padding: 12px; background: var(--accent); color: black; border: none; font-weight: bold; border-radius: 4px; cursor: pointer; text-transform: uppercase; margin-top: 10px; }
-        
-        .main-view { flex-grow: 1; position: relative; display: flex; align-items: center; justify-content: center; background: radial-gradient(#222 1px, transparent 1px); background-size: 20px 20px; overflow: auto; padding: 50px; }
-        
-        .preview-wrapper { position: relative; display: inline-block; border: 2px solid #444; transition: border-color 0.2s; }
-        .preview-wrapper.active { border-color: var(--accent); }
-        
-        #previewContainer { display: grid; gap: 2px; pointer-events: none; }
-        .preview-tile { background-size: cover; border: 1px solid rgba(255,255,255,0.1); position: relative; }
-        .preview-tile::after { content: attr(data-coord); position: absolute; top: 2px; left: 2px; font-size: 8px; background: rgba(0,0,0,0.7); padding: 1px 3px; color: var(--accent); }
+        #generateBtn { width: 100%; padding: 15px; background: var(--accent); color: black; border: none; font-weight: 800; border-radius: 4px; cursor: pointer; text-transform: uppercase; margin-top: 10px; }
+        #generateBtn:disabled { background: #444; cursor: not-allowed; }
 
-        /* Resizer Handles */
-        .resizer { position: absolute; width: 24px; height: 24px; background: var(--accent); border-radius: 50%; bottom: -12px; right: -12px; cursor: nwse-resize; z-index: 100; box-shadow: 0 0 15px rgba(0,255,136,0.5); display: flex; align-items: center; justify-content: center; }
-        .resizer::after { content: '↘'; color: black; font-weight: bold; font-size: 14px; }
+        .main-view { flex-grow: 1; position: relative; background: #111; overflow: hidden; display: flex; align-items: center; justify-content: center; touch-action: none; }
+        
+        /* Il "Muro" di fogli fisso */
+        #posterFrame { 
+            position: relative; 
+            border: 2px solid var(--accent); 
+            background: rgba(0,255,136,0.05);
+            overflow: hidden; /* L'immagine non uscirà dai bordi stabiliti */
+        }
+
+        /* L'immagine manipolabile */
+        #movableImage {
+            position: absolute;
+            top: 0; left: 0;
+            cursor: move;
+            transform-origin: top left;
+            user-select: none;
+        }
+
+        /* Griglia dei fogli in sovrapposizione */
+        #gridOverlay {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            display: grid;
+            pointer-events: none; /* Non intralcia il trascinamento dell'immagine */
+            z-index: 50;
+        }
+        .grid-line { border: 1px solid rgba(255,255,255,0.2); position: relative; }
+        .grid-line::after { 
+            content: attr(data-id); position: absolute; top: 2px; left: 2px; 
+            font-size: 9px; color: var(--accent); background: rgba(0,0,0,0.5); 
+        }
+
+        /* Maniglie per scalare l'immagine */
+        .scale-handle {
+            position: absolute;
+            width: 30px; height: 30px;
+            background: white;
+            border: 3px solid var(--accent);
+            border-radius: 50%;
+            bottom: -15px; right: -15px;
+            z-index: 100;
+            cursor: nwse-resize;
+        }
     </style>
 </head>
 <body>
     <div class="sidebar">
-        <h1>POSTER PRO v2</h1>
+        <h1>POSTER ENGINE v3</h1>
         <div class="control-group">
-            <label>Scegli Immagine</label>
+            <label>1. Carica Foto</label>
             <input type="file" id="imageInput" accept="image/*">
         </div>
         <div class="control-group">
-            <label>Larghezza (mm)</label>
-            <input type="number" id="targetWidth" value="600">
+            <label>2. Larghezza Totale (mm)</label>
+            <input type="number" id="targetWidth" value="1000">
         </div>
         <div class="control-group">
-            <label>Altezza (mm)</label>
-            <input type="number" id="targetHeight" value="900">
+            <label>3. Altezza Totale (mm)</label>
+            <input type="number" id="targetHeight" value="1000">
         </div>
         <div class="control-group">
-            <label>Sovrapposizione (mm)</label>
+            <label>4. Sovrapposizione (mm)</label>
             <input type="number" id="overlap" value="15">
         </div>
-        <button id="generateBtn">Scarica PDF per Stampa</button>
-        <p style="font-size: 10px; color: #666; margin-top: 20px;">Trascina il cerchio verde nell'anteprima per ridimensionare.</p>
+        <button id="generateBtn">Costruisci & Scarica PDF</button>
+        <p style="font-size: 10px; color: #888; margin-top: 15px;">
+            Istruzioni: Imposta le misure, poi trascina l'immagine o usa l'angolo bianco per adattarla alla cornice verde.
+        </p>
     </div>
     
     <div class="main-view">
-        <div class="preview-wrapper" id="interactWrapper">
-            <div id="previewContainer"></div>
-            <div class="resizer" id="resizeHandle"></div>
+        <div id="posterFrame">
+            <img id="movableImage" style="display:none;">
+            <div id="gridOverlay"></div>
+            <div id="scaleHandle" class="scale-handle" style="display:none;"></div>
         </div>
     </div>
 
