@@ -5,31 +5,28 @@ const imageInput = document.getElementById('imageInput') as HTMLInputElement;
 const targetWidthInput = document.getElementById('targetWidth') as HTMLInputElement;
 const targetHeightInput = document.getElementById('targetHeight') as HTMLInputElement;
 const overlapInput = document.getElementById('overlap') as HTMLInputElement;
+const zoomBoard = document.getElementById('zoomBoard') as HTMLInputElement;
 const generateBtn = document.getElementById('generateBtn') as HTMLButtonElement;
 const posterFrame = document.getElementById('posterFrame') as HTMLDivElement;
+const drawingBoard = document.getElementById('drawingBoard') as HTMLDivElement;
 const imageWrapper = document.getElementById('imageWrapper') as HTMLDivElement;
 const movableImage = document.getElementById('movableImage') as HTMLImageElement;
 const gridOverlay = document.getElementById('gridOverlay') as HTMLDivElement;
-const viewport = document.getElementById('viewport') as HTMLDivElement;
 
 let mmState = { x: 0, y: 0, w: 1000, h: 1000 };
 let isInteracting = false;
 let currentHandle: string | null = null;
 let start = { mx: 0, my: 0, ix: 0, iy: 0, iw: 0, ih: 0 };
 let currentFile: File | null = null;
-let dynamicScale = 0.5;
+const MM_TO_PX = 1; // 1mm = 1px sul tavolo da disegno reale
 
 function syncUI() {
     const wMm = Number(targetWidthInput.value);
     const hMm = Number(targetHeightInput.value);
     
-    // Ricalcolo scala per riempire lo schermo
-    const vW = viewport.clientWidth - 20;
-    const vH = viewport.clientHeight - 20;
-    dynamicScale = Math.min(vW / wMm, vH / hMm);
-
-    posterFrame.style.width = (wMm * dynamicScale).toString() + "px";
-    posterFrame.style.height = (hMm * dynamicScale).toString() + "px";
+    // Dimensioni fisiche della cornice di stampa
+    posterFrame.style.width = (wMm * MM_TO_PX).toString() + "px";
+    posterFrame.style.height = (hMm * MM_TO_PX).toString() + "px";
 
     const config: PosterConfig = {
         imageWidthPx: movableImage.naturalWidth || 100,
@@ -41,8 +38,6 @@ function syncUI() {
     const grid = calculateGrid(config);
     gridOverlay.style.gridTemplateColumns = `repeat(${Math.max(...grid.map(g => g.col)) + 1}, 1fr)`;
     gridOverlay.innerHTML = '';
-    
-    // CORREZIONE: Rimosso parametro 'i' non utilizzato
     grid.forEach(() => {
         const line = document.createElement('div');
         line.className = 'grid-line';
@@ -52,32 +47,48 @@ function syncUI() {
 }
 
 function updateVisuals() {
-    imageWrapper.style.transform = `translate(${mmState.x * dynamicScale}px, ${mmState.y * dynamicScale}px)`;
-    imageWrapper.style.width = (mmState.w * dynamicScale).toString() + "px";
-    imageWrapper.style.height = (mmState.h * dynamicScale).toString() + "px";
+    // Zoom globale del tavolo
+    drawingBoard.style.transform = `scale(${zoomBoard.value})`;
+    
+    // Posizione e dimensione dell'immagine (le maniglie seguono perché sono dentro il wrapper)
+    imageWrapper.style.left = (mmState.x * MM_TO_PX).toString() + "px";
+    imageWrapper.style.top = (mmState.y * MM_TO_PX).toString() + "px";
+    imageWrapper.style.width = (mmState.w * MM_TO_PX).toString() + "px";
+    imageWrapper.style.height = (mmState.h * MM_TO_PX).toString() + "px";
 }
 
 const onStart = (e: MouseEvent | TouchEvent) => {
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
     const target = e.target as HTMLElement;
+    
     isInteracting = true;
     currentHandle = target.getAttribute('data-h');
-    start = { mx: clientX, my: clientY, ix: mmState.x, iy: mmState.y, iw: mmState.w, ih: mmState.h };
-    e.preventDefault();
+    
+    start = { 
+        mx: clientX, my: clientY, 
+        ix: mmState.x, iy: mmState.y, 
+        iw: mmState.w, ih: mmState.h 
+    };
+    e.stopPropagation();
 };
 
 const onMove = (e: MouseEvent | TouchEvent) => {
     if (!isInteracting) return;
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-    const dx = (clientX - start.mx) / dynamicScale;
-    const dy = (clientY - start.my) / dynamicScale;
+    
+    // Delta corretto per lo zoom del tavolo
+    const boardZoom = Number(zoomBoard.value);
+    const dx = (clientX - start.mx) / boardZoom;
+    const dy = (clientY - start.my) / boardZoom;
 
     if (!currentHandle) {
+        // Spostamento intera foto
         mmState.x = start.ix + dx;
         mmState.y = start.iy + dy;
     } else {
+        // Ridimensionamento (Le maniglie sono ancorate all'immagine)
         if (currentHandle.includes('r')) mmState.w = Math.max(10, start.iw + dx);
         if (currentHandle.includes('l')) { mmState.w = Math.max(10, start.iw - dx); mmState.x = start.ix + dx; }
         if (currentHandle.includes('b')) mmState.h = Math.max(10, start.ih + dy);
@@ -92,7 +103,8 @@ window.addEventListener('mousemove', onMove);
 window.addEventListener('touchmove', onMove, {passive: false});
 window.addEventListener('mouseup', () => isInteracting = false);
 window.addEventListener('touchend', () => isInteracting = false);
-window.addEventListener('resize', syncUI);
+
+zoomBoard.addEventListener('input', updateVisuals);
 
 imageInput.addEventListener('change', (e) => {
     const file = (e.target as HTMLInputElement).files?.[0];
@@ -103,6 +115,7 @@ imageInput.addEventListener('change', (e) => {
         movableImage.src = ev.target?.result as string;
         imageWrapper.style.display = 'block';
         movableImage.onload = () => {
+            // All'inizio l'immagine coincide con la cornice verde
             mmState = { x: 0, y: 0, w: Number(targetWidthInput.value), h: Number(targetHeightInput.value) };
             syncUI();
         };
@@ -126,7 +139,7 @@ generateBtn.addEventListener('click', async () => {
     const blob = new Blob([pdfBytes as any], { type: 'application/pdf' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = 'Poster_Stampa_Distorzione.pdf'; a.click();
+    a.href = url; a.download = 'Poster_Pro_v6.pdf'; a.click();
     generateBtn.disabled = false;
-    generateBtn.innerText = "Scarica PDF Alta Qualità";
+    generateBtn.innerText = "Esporta PDF Finale";
 });
