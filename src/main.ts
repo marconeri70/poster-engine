@@ -3,60 +3,33 @@ import { generatePdf } from './PdfBuilder';
 
 const imageInput = document.getElementById('imageInput') as HTMLInputElement;
 const generateBtn = document.getElementById('generateBtn') as HTMLButtonElement;
+const previewContainer = document.getElementById('previewContainer') as HTMLDivElement;
 
-generateBtn.addEventListener('click', async () => {
-  const file = imageInput.files?.[0];
+function updatePreview(img: HTMLImageElement, config: PosterConfig, grid: any[]) {
+    previewContainer.innerHTML = '';
+    const cols = Math.max(...grid.map(p => p.col)) + 1;
+    const rows = Math.max(...grid.map(p => p.row)) + 1;
+
+    previewContainer.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
     
-      if (!file) {
-          alert("ERRORE: Devi prima caricare un'immagine.");
-              return;
-                }
+    grid.forEach(p => {
+        const tile = document.createElement('div');
+        tile.className = 'preview-tile';
+        tile.style.width = `${p.destWidthMm / 2}px`; // Scala ridotta per anteprima
+        tile.style.height = `${p.destHeightMm / 2}px`;
+        tile.style.backgroundImage = `url(${img.src})`;
+        
+        // Calcolo posizione background per simulare il taglio
+        const bgSizeX = (config.targetWidthMm / p.destWidthMm) * 100;
+        const bgSizeY = (config.targetHeightMm / p.destHeightMm) * 100;
+        const bgPosX = (p.sourceX / (config.imageWidthPx - p.sourceWidth)) * 100 || 0;
+        const bgPosY = (p.sourceY / (config.imageHeightPx - p.sourceHeight)) * 100 || 0;
 
-                  const img = new Image();
-                    const objectUrl = URL.createObjectURL(file);
+        tile.style.backgroundSize = `${bgSizeX}% ${bgSizeY}%`;
+        tile.style.backgroundPosition = `${bgPosX}% ${bgPosY}%`;
+        tile.setAttribute('data-coord', `${p.row+1}:${p.col+1}`);
+        previewContainer.appendChild(tile);
+    });
+}
 
-                      img.onload = async () => {
-                          const config: PosterConfig = {
-                                imageWidthPx: img.width,
-                                      imageHeightPx: img.height,
-                                            targetWidthMm: Number((document.getElementById('targetWidth') as HTMLInputElement).value),
-                                                  targetHeightMm: Number((document.getElementById('targetHeight') as HTMLInputElement).value),
-                                                        overlapMm: Number((document.getElementById('overlap') as HTMLInputElement).value),
-                                                              safeMarginMm: Number((document.getElementById('margin') as HTMLInputElement).value)
-                                                                  };
-
-                                                                      // 1. Calcola la matematica
-                                                                          const grid = calculateGrid(config);
-                                                                              
-                                                                                  // UI Feedback
-                                                                                      generateBtn.innerText = "GENERAZIONE PDF IN CORSO...";
-                                                                                          generateBtn.style.background = "#555";
-                                                                                              generateBtn.disabled = true;
-
-                                                                                                  try {
-                                                                                                        // 2. Costruisci il PDF
-                                                                                                              const pdfBytes = await generatePdf(file, config, grid);
-                                                                                                                    
-                                                                                                                          // 3. Forza il download nel browser
-                                                                                                                                const blob = new Blob([pdfBytes as any], { type: 'application/pdf' });
-                                                                                                                                      const url = URL.createObjectURL(blob);
-                                                                                                                                            const a = document.createElement('a');
-                                                                                                                                                  a.href = url;
-                                                                                                                                                        a.download = 'Mio_Poster_Suddiviso.pdf';
-                                                                                                                                                              a.click();
-                                                                                                                                                                    
-                                                                                                                                                                          URL.revokeObjectURL(url);
-                                                                                                                                                                              } catch (error) {
-                                                                                                                                                                                    alert("Si è verificato un errore durante la creazione del PDF.");
-                                                                                                                                                                                          console.error(error);
-                                                                                                                                                                                              } finally {
-                                                                                                                                                                                                    // Ripristina il bottone
-                                                                                                                                                                                                          generateBtn.innerText = "CALCOLA MATRICE";
-                                                                                                                                                                                                                generateBtn.style.background = "#000";
-                                                                                                                                                                                                                      generateBtn.disabled = false;
-                                                                                                                                                                                                                            URL.revokeObjectURL(objectUrl);
-                                                                                                                                                                                                                                }
-                                                                                                                                                                                                                                  };
-
-                                                                                                                                                                                                                                    img.src = objectUrl;
-                                                                                                                                                                                                                                    });
+// ... aggancia l'evento change di imageInput per chiamare updatePreview
