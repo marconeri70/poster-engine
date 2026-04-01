@@ -34,7 +34,6 @@ function renderGridPreview(img: HTMLImageElement, config: PosterConfig, grid: an
     previewContainer.innerHTML = '';
     
     const cols = Math.max(...grid.map(p => p.col)) + 1;
-    const rows = Math.max(...grid.map(p => p.row)) + 1;
 
     // Impostiamo la griglia CSS
     previewContainer.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
