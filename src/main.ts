@@ -6,128 +6,127 @@ const targetWidthInput = document.getElementById('targetWidth') as HTMLInputElem
 const targetHeightInput = document.getElementById('targetHeight') as HTMLInputElement;
 const overlapInput = document.getElementById('overlap') as HTMLInputElement;
 const generateBtn = document.getElementById('generateBtn') as HTMLButtonElement;
-const previewContainer = document.getElementById('previewContainer') as HTMLDivElement;
-const resizeHandle = document.getElementById('resizeHandle') as HTMLDivElement;
-const wrapper = document.getElementById('interactWrapper') as HTMLDivElement;
+const posterFrame = document.getElementById('posterFrame') as HTMLDivElement;
+const movableImage = document.getElementById('movableImage') as HTMLImageElement;
+const gridOverlay = document.getElementById('gridOverlay') as HTMLDivElement;
+const scaleHandle = document.getElementById('scaleHandle') as HTMLDivElement;
 
-let currentImage: HTMLImageElement | null = null;
-let currentFile: File | null = null;
+let imgState = { x: 0, y: 0, scale: 0.5 };
 let isDragging = false;
+let isScaling = false;
+let startX = 0, startY = 0;
+let currentFile: File | null = null;
 
-function updatePreview() {
-    if (!currentImage) return;
+// Sincronizza Cornice e Griglia
+function syncUI() {
+    const wMm = Number(targetWidthInput.value);
+    const hMm = Number(targetHeightInput.value);
+    const scaleFactor = 0.5; // Scala visuale 1px = 2mm per far stare tutto a schermo
+
+    posterFrame.style.width = `${wMm * scaleFactor}px`;
+    posterFrame.style.height = `${hMm * scaleFactor}px`;
 
     const config: PosterConfig = {
-        imageWidthPx: currentImage.width,
-        imageHeightPx: currentImage.height,
-        targetWidthMm: Number(targetWidthInput.value),
-        targetHeightMm: Number(targetHeightInput.value),
+        imageWidthPx: movableImage.naturalWidth,
+        imageHeightPx: movableImage.naturalHeight,
+        targetWidthMm: wMm,
+        targetHeightMm: hMm,
         overlapMm: Number(overlapInput.value),
         safeMarginMm: 5
     };
 
     const grid = calculateGrid(config);
-    renderGridPreview(currentImage, config, grid);
-}
-
-function renderGridPreview(img: HTMLImageElement, config: PosterConfig, grid: any[]) {
-    previewContainer.innerHTML = '';
     const cols = Math.max(...grid.map(p => p.col)) + 1;
-    previewContainer.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
-    
-    // Scala fissa per l'anteprima (1px = 1mm per comodità di calcolo nel wrapper)
-    const scale = 0.5; 
-
-    grid.forEach(p => {
-        const tile = document.createElement('div');
-        tile.className = 'preview-tile';
-        tile.style.width = `${p.destWidthMm * scale}px`;
-        tile.style.height = `${p.destHeightMm * scale}px`;
-        tile.style.backgroundImage = `url(${img.src})`;
-        
-        const bgSizeX = (config.targetWidthMm / p.destWidthMm) * 100;
-        const bgSizeY = (config.targetHeightMm / p.destHeightMm) * 100;
-        const percX = (p.sourceX / (config.imageWidthPx - p.sourceWidth)) * 100 || 0;
-        const percY = (p.sourceY / (config.imageHeightPx - p.sourceHeight)) * 100 || 0;
-
-        tile.style.backgroundSize = `${bgSizeX}% ${bgSizeY}%`;
-        tile.style.backgroundPosition = `${percX}% ${percY}%`;
-        tile.setAttribute('data-coord', `${p.row + 1}:${p.col + 1}`);
-        previewContainer.appendChild(tile);
+    gridOverlay.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+    gridOverlay.innerHTML = '';
+    grid.forEach((p, i) => {
+        const line = document.createElement('div');
+        line.className = 'grid-line';
+        line.setAttribute('data-id', i + 1);
+        gridOverlay.appendChild(line);
     });
 }
 
-// GESTIONE RESIZE INTERATTIVO
-const startResize = (e: MouseEvent | TouchEvent) => {
-    if (!currentImage) return;
-    isDragging = true;
-    wrapper.classList.add('active');
-    e.preventDefault();
-};
+// Manipolazione Immagine
+movableImage.addEventListener('mousedown', (e) => { isDragging = true; startX = e.clientX - imgState.x; startY = e.clientY - imgState.y; e.preventDefault(); });
+scaleHandle.addEventListener('mousedown', (e) => { isScaling = true; startX = e.clientX; startY = imgState.scale; e.preventDefault(); });
 
-const doResize = (e: MouseEvent | TouchEvent) => {
-    if (!isDragging) return;
-    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-    
-    const rect = previewContainer.getBoundingClientRect();
-    const newWidthMm = Math.round((clientX - rect.left) * 2); // Invertiamo la scala 0.5
-    const newHeightMm = Math.round((clientY - rect.top) * 2);
+window.addEventListener('mousemove', (e) => {
+    if (isDragging) {
+        imgState.x = e.clientX - startX;
+        imgState.y = e.clientY - startY;
+    } else if (isScaling) {
+        const delta = (e.clientX - startX) * 0.005;
+        imgState.scale = Math.max(0.1, startY + delta);
+    }
+    if (isDragging || isScaling) {
+        movableImage.style.transform = `translate(${imgState.x}px, ${imgState.y}px) scale(${imgState.scale})`;
+    }
+});
 
-    if (newWidthMm > 100) targetWidthInput.value = newWidthMm.toString();
-    if (newHeightMm > 100) targetHeightInput.value = newHeightMm.toString();
-    
-    updatePreview();
-};
+window.addEventListener('mouseup', () => { isDragging = false; isScaling = false; });
 
-const stopResize = () => {
-    isDragging = false;
-    wrapper.classList.remove('active');
-};
+// Mobile Touch
+movableImage.addEventListener('touchstart', (e) => { isDragging = true; startX = e.touches[0].clientX - imgState.x; startY = e.touches[0].clientY - imgState.y; });
+scaleHandle.addEventListener('touchstart', (e) => { isScaling = true; startX = e.touches[0].clientX; startY = imgState.scale; });
+window.addEventListener('touchmove', (e) => {
+    if (isDragging) {
+        imgState.x = e.touches[0].clientX - startX;
+        imgState.y = e.touches[0].clientY - startY;
+    } else if (isScaling) {
+        const delta = (e.touches[0].clientX - startX) * 0.005;
+        imgState.scale = Math.max(0.1, startY + delta);
+    }
+    if (isDragging || isScaling) {
+        movableImage.style.transform = `translate(${imgState.x}px, ${imgState.y}px) scale(${imgState.scale})`;
+    }
+});
 
-resizeHandle.addEventListener('mousedown', startResize);
-resizeHandle.addEventListener('touchstart', startResize);
-window.addEventListener('mousemove', doResize);
-window.addEventListener('touchmove', doResize);
-window.addEventListener('mouseup', stopResize);
-window.addEventListener('touchend', stopResize);
-
-// LISTENERS STANDARD
 imageInput.addEventListener('change', (e) => {
     const file = (e.target as HTMLInputElement).files?.[0];
     if (!file) return;
     currentFile = file;
     const reader = new FileReader();
     reader.onload = (ev) => {
-        const img = new Image();
-        img.onload = () => { currentImage = img; updatePreview(); };
-        img.src = ev.target?.result as string;
+        movableImage.src = ev.target?.result as string;
+        movableImage.style.display = 'block';
+        scaleHandle.style.display = 'block';
+        movableImage.onload = syncUI;
     };
     reader.readAsDataURL(file);
 });
 
-[targetWidthInput, targetHeightInput, overlapInput].forEach(input => {
-    input.addEventListener('input', updatePreview);
-});
+[targetWidthInput, targetHeightInput, overlapInput].forEach(i => i.addEventListener('input', syncUI));
 
 generateBtn.addEventListener('click', async () => {
-    if (!currentFile || !currentImage) return;
+    if (!currentFile || !movableImage.src) return;
+    generateBtn.disabled = true;
+    generateBtn.innerText = "COSTRUZIONE...";
+    
+    const wMm = Number(targetWidthInput.value);
+    const hMm = Number(targetHeightInput.value);
     const config = {
-        imageWidthPx: currentImage.width,
-        imageHeightPx: currentImage.height,
-        targetWidthMm: Number(targetWidthInput.value),
-        targetHeightMm: Number(targetHeightInput.value),
+        imageWidthPx: movableImage.naturalWidth,
+        imageHeightPx: movableImage.naturalHeight,
+        targetWidthMm: wMm,
+        targetHeightMm: hMm,
         overlapMm: Number(overlapInput.value),
         safeMarginMm: 5
     };
+
     const grid = calculateGrid(config);
-    generateBtn.innerText = "COSTRUZIONE PDF...";
-    const pdfBytes = await generatePdf(currentFile, config, grid);
+    // Passiamo le trasformazioni (scale, x, y) convertite in mm per il PDF
+    const pdfBytes = await generatePdf(currentFile, config, grid, {
+        scale: imgState.scale * 2, // Riportiamo alla scala mm reale
+        x: imgState.x * 2,
+        y: imgState.y * 2
+    });
+
     const blob = new Blob([pdfBytes as any], { type: 'application/pdf' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url;
-    a.download = `Poster_Pro_${config.targetWidthMm}mm.pdf`;
-    a.click();
-    generateBtn.innerText = "Scarica PDF per Stampa";
+    a.href = url; a.download = 'Poster_Chirurgico.pdf'; a.click();
+    
+    generateBtn.disabled = false;
+    generateBtn.innerText = "Costruisci & Scarica PDF";
 });
