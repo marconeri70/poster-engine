@@ -12,39 +12,30 @@ const drawingBoard = document.getElementById('drawingBoard') as HTMLDivElement;
 const imageWrapper = document.getElementById('imageWrapper') as HTMLDivElement;
 const movableImage = document.getElementById('movableImage') as HTMLImageElement;
 const gridOverlay = document.getElementById('gridOverlay') as HTMLDivElement;
-const viewport = document.getElementById('viewport') as HTMLDivElement;
 
 let mmState = { x: 0, y: 0, w: 1000, h: 1000 };
 let isInteracting = false;
 let currentHandle: string | null = null;
 let start = { mx: 0, my: 0, ix: 0, iy: 0, iw: 0, ih: 0 };
 let currentFile: File | null = null;
-let dynamicScale = 0.5;
 
 function syncUI() {
     const wMm = Number(targetWidthInput.value);
     const hMm = Number(targetHeightInput.value);
     
-    // Scala per adattarsi allo schermo
-    const vW = viewport.clientWidth - 40;
-    const vH = viewport.clientHeight - 40;
-    dynamicScale = Math.min(vW / wMm, vH / hMm) * Number(zoomBoard.value);
-
-    posterFrame.style.width = `${wMm * dynamicScale}px`;
-    posterFrame.style.height = `${hMm * dynamicScale}px`;
+    posterFrame.style.width = `${wMm}px`;
+    posterFrame.style.height = `${hMm}px`;
 
     const config: PosterConfig = {
         imageWidthPx: movableImage.naturalWidth || 100,
         imageHeightPx: movableImage.naturalHeight || 100,
         targetWidthMm: wMm, targetHeightMm: hMm,
-        overlapMm: Number(overlapInput.value), safeMarginMm: 10 // Margine aumentato per sicurezza stampa
+        overlapMm: Number(overlapInput.value), safeMarginMm: 10 
     };
 
     const grid = calculateGrid(config);
     gridOverlay.style.gridTemplateColumns = `repeat(${Math.max(...grid.map(g => g.col)) + 1}, 1fr)`;
     gridOverlay.innerHTML = '';
-    
-    // FIX: Rimosso parametro 'i' inutilizzato
     grid.forEach(() => {
         const line = document.createElement('div');
         line.className = 'grid-line';
@@ -54,26 +45,32 @@ function syncUI() {
 }
 
 function updateVisuals() {
-    imageWrapper.style.transform = `translate(${mmState.x * dynamicScale}px, ${mmState.y * dynamicScale}px)`;
-    imageWrapper.style.width = `${mmState.w * dynamicScale}px`;
-    imageWrapper.style.height = `${mmState.h * dynamicScale}px`;
+    drawingBoard.style.transform = `scale(${zoomBoard.value})`;
+    imageWrapper.style.left = `${mmState.x}px`;
+    imageWrapper.style.top = `${mmState.y}px`;
+    imageWrapper.style.width = `${mmState.w}px`;
+    imageWrapper.style.height = `${mmState.h}px`;
 }
 
 const onStart = (e: MouseEvent | TouchEvent) => {
-    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    const clientX = 'touches' in e ? e.touches[0].clientX : (e as MouseEvent).clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : (e as MouseEvent).clientY;
     const target = e.target as HTMLElement;
+    
     isInteracting = true;
     currentHandle = target.getAttribute('data-h');
     start = { mx: clientX, my: clientY, ix: mmState.x, iy: mmState.y, iw: mmState.w, ih: mmState.h };
+    e.stopPropagation();
 };
 
 const onMove = (e: MouseEvent | TouchEvent) => {
     if (!isInteracting) return;
-    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-    const dx = (clientX - start.mx) / dynamicScale;
-    const dy = (clientY - start.my) / dynamicScale;
+    const clientX = 'touches' in e ? e.touches[0].clientX : (e as MouseEvent).clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : (e as MouseEvent).clientY;
+    
+    const boardZoom = Number(zoomBoard.value);
+    const dx = (clientX - start.mx) / boardZoom;
+    const dy = (clientY - start.my) / boardZoom;
 
     if (!currentHandle) {
         mmState.x = start.ix + dx;
@@ -94,7 +91,7 @@ window.addEventListener('touchmove', onMove, {passive: false});
 window.addEventListener('mouseup', () => isInteracting = false);
 window.addEventListener('touchend', () => isInteracting = false);
 
-zoomBoard.addEventListener('input', syncUI);
+zoomBoard.addEventListener('input', updateVisuals);
 
 imageInput.addEventListener('change', (e) => {
     const file = (e.target as HTMLInputElement).files?.[0];
@@ -127,8 +124,8 @@ generateBtn.addEventListener('click', async () => {
     const pdfBytes = await generatePdf(currentFile, config, grid, mmState);
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([pdfBytes as any], { type: 'application/pdf' }));
-    a.download = 'Poster_Stampa_Protetta.pdf';
+    a.download = 'Poster_Elite_v6.pdf';
     a.click();
     generateBtn.disabled = false;
-    generateBtn.innerText = "Scarica PDF Alta Qualità";
+    generateBtn.innerText = "Esporta PDF Finale";
 });
