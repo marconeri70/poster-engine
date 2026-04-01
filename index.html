@@ -21,15 +21,13 @@
 
         .main-view { flex-grow: 1; position: relative; background: #111; overflow: hidden; display: flex; align-items: center; justify-content: center; touch-action: none; }
         
-        /* Il "Muro" di fogli fisso */
         #posterFrame { 
             position: relative; 
             border: 2px solid var(--accent); 
-            background: rgba(0,255,136,0.05);
-            overflow: hidden; /* L'immagine non uscirà dai bordi stabiliti */
+            background: #000;
+            overflow: hidden; 
         }
 
-        /* L'immagine manipolabile */
         #movableImage {
             position: absolute;
             top: 0; left: 0;
@@ -38,31 +36,25 @@
             user-select: none;
         }
 
-        /* Griglia dei fogli in sovrapposizione */
         #gridOverlay {
             position: absolute;
             top: 0; left: 0;
             width: 100%; height: 100%;
             display: grid;
-            pointer-events: none; /* Non intralcia il trascinamento dell'immagine */
+            pointer-events: none; 
             z-index: 50;
         }
-        .grid-line { border: 1px solid rgba(255,255,255,0.2); position: relative; }
+        .grid-line { border: 1px solid rgba(0, 255, 136, 0.3); position: relative; box-sizing: border-box; }
         .grid-line::after { 
             content: attr(data-id); position: absolute; top: 2px; left: 2px; 
-            font-size: 9px; color: var(--accent); background: rgba(0,0,0,0.5); 
+            font-size: 9px; color: var(--accent); background: rgba(0,0,0,0.5); padding: 1px 3px;
         }
 
-        /* Maniglie per scalare l'immagine */
         .scale-handle {
-            position: absolute;
-            width: 30px; height: 30px;
-            background: white;
-            border: 3px solid var(--accent);
-            border-radius: 50%;
-            bottom: -15px; right: -15px;
-            z-index: 100;
-            cursor: nwse-resize;
+            position: absolute; width: 30px; height: 30px;
+            background: white; border: 3px solid var(--accent); border-radius: 50%;
+            bottom: -15px; right: -15px; z-index: 100; cursor: nwse-resize;
+            box-shadow: 0 0 15px rgba(0,255,136,0.5);
         }
     </style>
 </head>
@@ -74,20 +66,20 @@
             <input type="file" id="imageInput" accept="image/*">
         </div>
         <div class="control-group">
-            <label>2. Larghezza Totale (mm)</label>
+            <label>2. Larghezza Parete (mm)</label>
             <input type="number" id="targetWidth" value="1000">
         </div>
         <div class="control-group">
-            <label>3. Altezza Totale (mm)</label>
+            <label>3. Altezza Parete (mm)</label>
             <input type="number" id="targetHeight" value="1000">
         </div>
         <div class="control-group">
             <label>4. Sovrapposizione (mm)</label>
             <input type="number" id="overlap" value="15">
         </div>
-        <button id="generateBtn">Costruisci & Scarica PDF</button>
+        <button id="generateBtn">Scarica PDF Ritagliato</button>
         <p style="font-size: 10px; color: #888; margin-top: 15px;">
-            Istruzioni: Imposta le misure, poi trascina l'immagine o usa l'angolo bianco per adattarla alla cornice verde.
+            <b>Istruzioni:</b> Sposta la foto con il dito. Usa il cerchio bianco per ingrandire. Quello che vedi dentro la cornice verde sarà stampato.
         </p>
     </div>
     
@@ -98,7 +90,6 @@
             <div id="scaleHandle" class="scale-handle" style="display:none;"></div>
         </div>
     </div>
-
     <script type="module" src="/src/main.ts"></script>
 </body>
 </html>
