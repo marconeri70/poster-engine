@@ -17,28 +17,26 @@
         .control-group { margin-bottom: 12px; }
         label { display: block; font-size: 9px; text-transform: uppercase; color: #888; margin-bottom: 4px; }
         input { width: 100%; background: #222; border: 1px solid #333; padding: 10px; color: white; border-radius: 4px; box-sizing: border-box; font-size: 14px; }
-        input[type="range"] { accent-color: var(--accent); }
+        input[type="range"] { accent-color: var(--accent); cursor: pointer; }
         
         #generateBtn { width: 100%; padding: 15px; background: var(--accent); color: black; border: none; font-weight: 800; border-radius: 4px; cursor: pointer; text-transform: uppercase; }
-        
-        /* Area di lavoro infinita */
+
         .main-view { flex-grow: 1; position: relative; background: #000; overflow: hidden; display: flex; align-items: center; justify-content: center; touch-action: none; }
         
-        /* Tavolo da disegno (che possiamo zoomare) */
-        #drawingBoard { position: relative; transform-origin: center; transition: transform 0.1s; display: flex; align-items: center; justify-content: center; }
+        /* Tavolo da disegno zoomabile */
+        #drawingBoard { position: relative; transform-origin: center; display: flex; align-items: center; justify-content: center; }
 
-        /* Cornice di stampa (Il bersaglio) */
-        #posterFrame { position: relative; border: 2px solid var(--accent); background: rgba(0,255,136,0.05); z-index: 10; pointer-events: none; box-shadow: 0 0 0 2000px rgba(0,0,0,0.7); }
+        /* Cornice di stampa (Riferimento fisso) */
+        #posterFrame { position: relative; border: 2px solid var(--accent); background: rgba(0,255,136,0.05); z-index: 10; pointer-events: none; box-shadow: 0 0 0 4000px rgba(0,0,0,0.8); }
 
-        /* Contenitore Immagine (Sotto la cornice) */
+        /* Contenitore Immagine con maniglie ancorate */
         #imageWrapper { position: absolute; z-index: 5; transform-origin: top left; }
-        #movableImage { width: 100%; height: 100%; object-fit: fill; opacity: 0.8; user-select: none; pointer-events: none; border: 1px dashed rgba(255,255,255,0.3); }
+        #movableImage { width: 100%; height: 100%; object-fit: fill; opacity: 0.7; user-select: none; pointer-events: none; border: 1px dashed rgba(255,255,255,0.3); }
 
-        /* Le maniglie devono stare sopra l'immagine e seguirne i bordi */
-        .handle { position: absolute; width: 22px; height: 22px; background: white; border: 3px solid var(--accent); border-radius: 50%; z-index: 100; pointer-events: all; cursor: pointer; box-shadow: 0 0 15px rgba(0,0,0,0.5); }
-        .handle.tl { top: -11px; left: -11px; } .handle.tm { top: -11px; left: 50%; transform: translateX(-50%); } .handle.tr { top: -11px; right: -11px; }
-        .handle.ml { top: 50%; left: -11px; transform: translateY(-50%); } .handle.mr { top: 50%; right: -11px; transform: translateY(-50%); }
-        .handle.bl { bottom: -11px; left: -11px; } .handle.bm { bottom: -11px; left: 50%; transform: translateX(-50%); } .handle.br { bottom: -11px; right: -11px; }
+        .handle { position: absolute; width: 24px; height: 24px; background: white; border: 3px solid var(--accent); border-radius: 50%; z-index: 100; pointer-events: all; cursor: pointer; box-shadow: 0 0 15px rgba(0,0,0,0.5); }
+        .handle.tl { top: -12px; left: -12px; } .handle.tm { top: -12px; left: 50%; transform: translateX(-50%); } .handle.tr { top: -12px; right: -12px; }
+        .handle.ml { top: 50%; left: -12px; transform: translateY(-50%); } .handle.mr { top: 50%; right: -12px; transform: translateY(-50%); }
+        .handle.bl { bottom: -12px; left: -12px; } .handle.bm { bottom: -12px; left: 50%; transform: translateX(-50%); } .handle.br { bottom: -12px; right: -12px; }
 
         #gridOverlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: grid; z-index: 15; }
         .grid-line { border: 1px solid rgba(0, 255, 136, 0.2); }
@@ -48,23 +46,23 @@
     <div class="sidebar">
         <h1>POSTER PRO v6</h1>
         <div class="control-group">
-            <label>1. Zoom Tavolo Lavoro</label>
+            <label>🔍 Zoom Tavolo (Ergonomia)</label>
             <input type="range" id="zoomBoard" min="0.1" max="2" step="0.1" value="0.5">
         </div>
         <div class="control-group">
-            <label>2. Foto Sorgente</label>
+            <label>Foto Sorgente</label>
             <input type="file" id="imageInput" accept="image/*">
         </div>
         <div class="control-group">
-            <label>3. Larghezza Muro (mm)</label>
+            <label>Larghezza (mm)</label>
             <input type="number" id="targetWidth" value="1000">
         </div>
         <div class="control-group">
-            <label>4. Altezza Muro (mm)</label>
+            <label>Altezza (mm)</label>
             <input type="number" id="targetHeight" value="1000">
         </div>
         <div class="control-group">
-            <label>5. Sovrapposizione (mm)</label>
+            <label>Sovrapposizione (mm)</label>
             <input type="number" id="overlap" value="15">
         </div>
         <button id="generateBtn">Esporta PDF Finale</button>
@@ -73,7 +71,7 @@
     <div class="main-view">
         <div id="drawingBoard">
             <div id="imageWrapper" style="display:none;">
-                <img id="movableImage">
+                <img id="movableImage" alt="Poster Preview">
                 <div class="handle tl" data-h="tl"></div>
                 <div class="handle tm" data-h="tm"></div>
                 <div class="handle tr" data-h="tr"></div>
