@@ -3,73 +3,72 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Poster Engine Pro v4</title>
+    <title>Poster Engine Pro v5</title>
+    <meta name="theme-color" content="#0a0a0a">
+    <link rel="manifest" href="/poster-engine/manifest.json">
+    <link rel="apple-touch-icon" href="/poster-engine/icons.svg">
+    
     <style>
         :root { --accent: #00ff88; --bg: #0a0a0a; --card: #1a1a1a; }
         body { font-family: 'Inter', sans-serif; background: var(--bg); color: white; margin: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
         
-        .sidebar { padding: 20px; background: var(--card); z-index: 100; box-shadow: 0 0 20px rgba(0,0,0,0.5); }
-        @media (min-width: 768px) { body { flex-direction: row; } .sidebar { width: 320px; height: 100vh; } }
+        .sidebar { padding: 15px; background: var(--card); z-index: 200; box-shadow: 0 0 20px rgba(0,0,0,0.5); flex-shrink: 0; }
+        @media (min-width: 768px) { body { flex-direction: row; } .sidebar { width: 300px; height: 100vh; } }
         
-        h1 { font-size: 1.2rem; color: var(--accent); margin: 0 0 20px 0; text-align: center; font-weight: 800; }
-        .control-group { margin-bottom: 15px; }
-        label { display: block; font-size: 10px; text-transform: uppercase; color: #888; margin-bottom: 5px; }
-        input { width: 100%; background: #2a2a2a; border: 1px solid #3a3a3a; padding: 10px; color: white; border-radius: 4px; box-sizing: border-box; }
+        h1 { font-size: 1.1rem; color: var(--accent); margin: 0 0 15px 0; text-align: center; font-weight: 900; }
+        .control-group { margin-bottom: 10px; }
+        label { display: block; font-size: 9px; text-transform: uppercase; color: #888; margin-bottom: 3px; }
+        input { width: 100%; background: #2a2a2a; border: 1px solid #3a3a3a; padding: 8px; color: white; border-radius: 4px; box-sizing: border-box; font-size: 14px; }
         
-        #generateBtn { width: 100%; padding: 15px; background: var(--accent); color: black; border: none; font-weight: 800; border-radius: 4px; cursor: pointer; text-transform: uppercase; margin-top: 10px; }
-        #generateBtn:disabled { background: #444; cursor: not-allowed; }
+        #generateBtn { width: 100%; padding: 12px; background: var(--accent); color: black; border: none; font-weight: 800; border-radius: 4px; cursor: pointer; text-transform: uppercase; margin-top: 5px; }
+        #generateBtn:disabled { background: #444; opacity: 0.5; }
 
-        .main-view { flex-grow: 1; position: relative; background: radial-gradient(#222 1px, transparent 1px); background-size: 20px 20px; overflow: hidden; display: flex; align-items: center; justify-content: center; touch-action: none; }
+        .main-view { flex-grow: 1; position: relative; background: #000; display: flex; align-items: center; justify-content: center; touch-action: none; overflow: hidden; padding: 20px; box-sizing: border-box; }
         
-        #posterFrame { position: relative; border: 2px solid var(--accent); background: #000; overflow: hidden; }
+        #posterFrame { position: relative; border: 1px solid var(--accent); background: #050505; box-shadow: 0 0 60px rgba(0,0,0,1); }
+        #imageWrapper { position: absolute; top: 0; left: 0; transform-origin: top left; display: none; }
+        #movableImage { width: 100%; height: 100%; object-fit: fill; user-select: none; }
 
-        #imageWrapper { position: absolute; top: 0; left: 0; cursor: move; }
-        #movableImage { width: 100%; height: 100%; object-fit: fill; user-select: none; pointer-events: none; }
-
-        /* Le 8 Maniglie */
-        .handle { position: absolute; width: 16px; height: 16px; background: white; border: 2px solid var(--accent); border-radius: 50%; z-index: 100; }
-        .handle.tl { top: -8px; left: -8px; cursor: nw-resize; }
-        .handle.tm { top: -8px; left: 50%; transform: translateX(-50%); cursor: n-resize; }
-        .handle.tr { top: -8px; right: -8px; cursor: ne-resize; }
-        .handle.ml { top: 50%; left: -8px; transform: translateY(-50%); cursor: w-resize; }
-        .handle.mr { top: 50%; right: -8px; transform: translateY(-50%); cursor: e-resize; }
-        .handle.bl { bottom: -8px; left: -8px; cursor: sw-resize; }
-        .handle.bm { bottom: -8px; left: 50%; transform: translateX(-50%); cursor: s-resize; }
-        .handle.br { bottom: -8px; right: -8px; cursor: se-resize; }
+        .handle { position: absolute; width: 18px; height: 18px; background: white; border: 2px solid var(--accent); border-radius: 50%; z-index: 100; box-shadow: 0 0 10px var(--accent); }
+        .handle.tl { top: -9px; left: -9px; cursor: nw-resize; }
+        .handle.tm { top: -9px; left: 50%; transform: translateX(-50%); cursor: n-resize; }
+        .handle.tr { top: -9px; right: -9px; cursor: ne-resize; }
+        .handle.ml { top: 50%; left: -9px; transform: translateY(-50%); cursor: w-resize; }
+        .handle.mr { top: 50%; right: -9px; transform: translateY(-50%); cursor: e-resize; }
+        .handle.bl { bottom: -9px; left: -9px; cursor: sw-resize; }
+        .handle.bm { bottom: -9px; left: 50%; transform: translateX(-50%); cursor: s-resize; }
+        .handle.br { bottom: -9px; right: -9px; cursor: se-resize; }
 
         #gridOverlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: grid; pointer-events: none; z-index: 50; }
-        .grid-line { border: 1px solid rgba(0, 255, 136, 0.2); position: relative; box-sizing: border-box; }
-        .grid-line::after { content: attr(data-id); position: absolute; top: 2px; left: 2px; font-size: 9px; color: var(--accent); background: rgba(0,0,0,0.5); padding: 1px 3px; }
+        .grid-line { border: 1px solid rgba(0, 255, 136, 0.2); position: relative; }
     </style>
 </head>
 <body>
     <div class="sidebar">
-        <h1>POSTER PRO v4</h1>
+        <h1>POSTER PRO v5</h1>
         <div class="control-group">
-            <label>1. Carica Foto</label>
+            <label>Sorgente Immagine</label>
             <input type="file" id="imageInput" accept="image/*">
         </div>
         <div class="control-group">
-            <label>2. Larghezza Superficie (mm)</label>
+            <label>Larghezza Parete (mm)</label>
             <input type="number" id="targetWidth" value="1000">
         </div>
         <div class="control-group">
-            <label>3. Altezza Superficie (mm)</label>
+            <label>Altezza Parete (mm)</label>
             <input type="number" id="targetHeight" value="1000">
         </div>
         <div class="control-group">
-            <label>4. Sovrapposizione (mm)</label>
+            <label>Overlapping (mm)</label>
             <input type="number" id="overlap" value="15">
         </div>
-        <button id="generateBtn">Scarica PDF Distorto</button>
-        <p style="font-size: 10px; color: #888; margin-top: 15px;">
-            <b>Istruzioni:</b> Trascina le maniglie bianche sui lati e sugli angoli per distorcere l'immagine e adattarla alla cornice verde.
-        </p>
+        <button id="generateBtn">Scarica File di Stampa</button>
+        <p style="font-size: 9px; color: #666; margin-top: 10px;">Versione installabile su PC/Smartphone (PWA ready)</p>
     </div>
     
-    <div class="main-view">
+    <div class="main-view" id="viewport">
         <div id="posterFrame">
-            <div id="imageWrapper" style="display:none;">
+            <div id="imageWrapper">
                 <img id="movableImage">
                 <div class="handle tl" data-h="tl"></div>
                 <div class="handle tm" data-h="tm"></div>
