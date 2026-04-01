@@ -18,15 +18,14 @@ let isInteracting = false;
 let currentHandle: string | null = null;
 let start = { mx: 0, my: 0, ix: 0, iy: 0, iw: 0, ih: 0 };
 let currentFile: File | null = null;
-const MM_TO_PX = 1; // 1mm = 1px sul tavolo da disegno reale
+const MM_TO_PX = 1; 
 
 function syncUI() {
     const wMm = Number(targetWidthInput.value);
     const hMm = Number(targetHeightInput.value);
     
-    // Dimensioni fisiche della cornice di stampa
-    posterFrame.style.width = (wMm * MM_TO_PX).toString() + "px";
-    posterFrame.style.height = (hMm * MM_TO_PX).toString() + "px";
+    posterFrame.style.width = `${wMm * MM_TO_PX}px`;
+    posterFrame.style.height = `${hMm * MM_TO_PX}px`;
 
     const config: PosterConfig = {
         imageWidthPx: movableImage.naturalWidth || 100,
@@ -47,14 +46,11 @@ function syncUI() {
 }
 
 function updateVisuals() {
-    // Zoom globale del tavolo
     drawingBoard.style.transform = `scale(${zoomBoard.value})`;
-    
-    // Posizione e dimensione dell'immagine (le maniglie seguono perché sono dentro il wrapper)
-    imageWrapper.style.left = (mmState.x * MM_TO_PX).toString() + "px";
-    imageWrapper.style.top = (mmState.y * MM_TO_PX).toString() + "px";
-    imageWrapper.style.width = (mmState.w * MM_TO_PX).toString() + "px";
-    imageWrapper.style.height = (mmState.h * MM_TO_PX).toString() + "px";
+    imageWrapper.style.left = `${mmState.x * MM_TO_PX}px`;
+    imageWrapper.style.top = `${mmState.y * MM_TO_PX}px`;
+    imageWrapper.style.width = `${mmState.w * MM_TO_PX}px`;
+    imageWrapper.style.height = `${mmState.h * MM_TO_PX}px`;
 }
 
 const onStart = (e: MouseEvent | TouchEvent) => {
@@ -64,12 +60,7 @@ const onStart = (e: MouseEvent | TouchEvent) => {
     
     isInteracting = true;
     currentHandle = target.getAttribute('data-h');
-    
-    start = { 
-        mx: clientX, my: clientY, 
-        ix: mmState.x, iy: mmState.y, 
-        iw: mmState.w, ih: mmState.h 
-    };
+    start = { mx: clientX, my: clientY, ix: mmState.x, iy: mmState.y, iw: mmState.w, ih: mmState.h };
     e.stopPropagation();
 };
 
@@ -77,18 +68,14 @@ const onMove = (e: MouseEvent | TouchEvent) => {
     if (!isInteracting) return;
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-    
-    // Delta corretto per lo zoom del tavolo
-    const boardZoom = Number(zoomBoard.value);
-    const dx = (clientX - start.mx) / boardZoom;
-    const dy = (clientY - start.my) / boardZoom;
+    const bZoom = Number(zoomBoard.value);
+    const dx = (clientX - start.mx) / bZoom;
+    const dy = (clientY - start.my) / bZoom;
 
     if (!currentHandle) {
-        // Spostamento intera foto
         mmState.x = start.ix + dx;
         mmState.y = start.iy + dy;
     } else {
-        // Ridimensionamento (Le maniglie sono ancorate all'immagine)
         if (currentHandle.includes('r')) mmState.w = Math.max(10, start.iw + dx);
         if (currentHandle.includes('l')) { mmState.w = Math.max(10, start.iw - dx); mmState.x = start.ix + dx; }
         if (currentHandle.includes('b')) mmState.h = Math.max(10, start.ih + dy);
@@ -112,10 +99,9 @@ imageInput.addEventListener('change', (e) => {
     currentFile = file;
     const reader = new FileReader();
     reader.onload = (ev) => {
-        movableImage.src = ev.target?.result as string;
+        movableImage.src = String(ev.target?.result);
         imageWrapper.style.display = 'block';
         movableImage.onload = () => {
-            // All'inizio l'immagine coincide con la cornice verde
             mmState = { x: 0, y: 0, w: Number(targetWidthInput.value), h: Number(targetHeightInput.value) };
             syncUI();
         };
@@ -128,7 +114,7 @@ imageInput.addEventListener('change', (e) => {
 generateBtn.addEventListener('click', async () => {
     if (!currentFile || !movableImage.src) return;
     generateBtn.disabled = true;
-    generateBtn.innerText = "COSTRUZIONE PDF...";
+    generateBtn.innerText = "ESPORTAZIONE...";
     const config = {
         imageWidthPx: movableImage.naturalWidth, imageHeightPx: movableImage.naturalHeight,
         targetWidthMm: Number(targetWidthInput.value), targetHeightMm: Number(targetHeightInput.value),
@@ -136,10 +122,10 @@ generateBtn.addEventListener('click', async () => {
     };
     const grid = calculateGrid(config);
     const pdfBytes = await generatePdf(currentFile, config, grid, mmState);
-    const blob = new Blob([pdfBytes as any], { type: 'application/pdf' });
-    const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = 'Poster_Pro_v6.pdf'; a.click();
+    a.href = URL.createObjectURL(new Blob([pdfBytes as any], { type: 'application/pdf' }));
+    a.download = 'Poster_Elite_v6.pdf';
+    a.click();
     generateBtn.disabled = false;
     generateBtn.innerText = "Esporta PDF Finale";
 });
