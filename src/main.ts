@@ -11,20 +11,20 @@ const movableImage = document.getElementById('movableImage') as HTMLImageElement
 const gridOverlay = document.getElementById('gridOverlay') as HTMLDivElement;
 const scaleHandle = document.getElementById('scaleHandle') as HTMLDivElement;
 
-let imgState = { x: 0, y: 0, scale: 0.5 };
+let imgState = { x: 0, y: 0, scale: 0.3 };
 let isDragging = false;
 let isScaling = false;
 let startX = 0, startY = 0;
+let startScale = 0;
 let currentFile: File | null = null;
+const VIEW_SCALE = 0.4; // 1mm = 0.4px per l'anteprima
 
-// Sincronizza Cornice e Griglia
 function syncUI() {
     const wMm = Number(targetWidthInput.value);
     const hMm = Number(targetHeightInput.value);
-    const scaleFactor = 0.5; // Scala visuale 1px = 2mm per far stare tutto a schermo
 
-    posterFrame.style.width = `${wMm * scaleFactor}px`;
-    posterFrame.style.height = `${hMm * scaleFactor}px`;
+    posterFrame.style.width = (wMm * VIEW_SCALE).toString() + "px";
+    posterFrame.style.height = (hMm * VIEW_SCALE).toString() + "px";
 
     const config: PosterConfig = {
         imageWidthPx: movableImage.naturalWidth,
@@ -36,51 +36,63 @@ function syncUI() {
     };
 
     const grid = calculateGrid(config);
-    const cols = Math.max(...grid.map(p => p.col)) + 1;
+    const cols = Math.max(...grid.map(g => g.col)) + 1;
     gridOverlay.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
     gridOverlay.innerHTML = '';
-    grid.forEach((p, i) => {
+    grid.forEach((_, i) => {
         const line = document.createElement('div');
         line.className = 'grid-line';
-        line.setAttribute('data-id', i + 1);
+        line.setAttribute('data-id', (i + 1).toString());
         gridOverlay.appendChild(line);
     });
 }
 
-// Manipolazione Immagine
-movableImage.addEventListener('mousedown', (e) => { isDragging = true; startX = e.clientX - imgState.x; startY = e.clientY - imgState.y; e.preventDefault(); });
-scaleHandle.addEventListener('mousedown', (e) => { isScaling = true; startX = e.clientX; startY = imgState.scale; e.preventDefault(); });
+const updateTransform = () => {
+    movableImage.style.transform = `translate(${imgState.x}px, ${imgState.y}px) scale(${imgState.scale})`;
+};
+
+// Eventi Mouse/Touch
+const onStart = (e: MouseEvent | TouchEvent, type: 'drag' | 'scale') => {
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    if (type === 'drag') {
+        isDragging = true;
+        startX = clientX - imgState.x;
+        startY = clientY - imgState.y;
+    } else {
+        isScaling = true;
+        startX = clientX;
+        startScale = imgState.scale;
+    }
+};
+
+movableImage.addEventListener('mousedown', (e) => onStart(e, 'drag'));
+movableImage.addEventListener('touchstart', (e) => onStart(e, 'drag'));
+scaleHandle.addEventListener('mousedown', (e) => onStart(e, 'scale'));
+scaleHandle.addEventListener('touchstart', (e) => onStart(e, 'scale'));
 
 window.addEventListener('mousemove', (e) => {
     if (isDragging) {
         imgState.x = e.clientX - startX;
         imgState.y = e.clientY - startY;
     } else if (isScaling) {
-        const delta = (e.clientX - startX) * 0.005;
-        imgState.scale = Math.max(0.1, startY + delta);
+        imgState.scale = Math.max(0.05, startScale + (e.clientX - startX) * 0.002);
     }
-    if (isDragging || isScaling) {
-        movableImage.style.transform = `translate(${imgState.x}px, ${imgState.y}px) scale(${imgState.scale})`;
-    }
+    if (isDragging || isScaling) updateTransform();
 });
 
-window.addEventListener('mouseup', () => { isDragging = false; isScaling = false; });
-
-// Mobile Touch
-movableImage.addEventListener('touchstart', (e) => { isDragging = true; startX = e.touches[0].clientX - imgState.x; startY = e.touches[0].clientY - imgState.y; });
-scaleHandle.addEventListener('touchstart', (e) => { isScaling = true; startX = e.touches[0].clientX; startY = imgState.scale; });
 window.addEventListener('touchmove', (e) => {
     if (isDragging) {
         imgState.x = e.touches[0].clientX - startX;
         imgState.y = e.touches[0].clientY - startY;
     } else if (isScaling) {
-        const delta = (e.touches[0].clientX - startX) * 0.005;
-        imgState.scale = Math.max(0.1, startY + delta);
+        imgState.scale = Math.max(0.05, startScale + (e.touches[0].clientX - startX) * 0.002);
     }
-    if (isDragging || isScaling) {
-        movableImage.style.transform = `translate(${imgState.x}px, ${imgState.y}px) scale(${imgState.scale})`;
-    }
+    if (isDragging || isScaling) updateTransform();
 });
+
+window.addEventListener('mouseup', () => { isDragging = false; isScaling = false; });
+window.addEventListener('touchend', () => { isDragging = false; isScaling = false; });
 
 imageInput.addEventListener('change', (e) => {
     const file = (e.target as HTMLInputElement).files?.[0];
@@ -96,37 +108,32 @@ imageInput.addEventListener('change', (e) => {
     reader.readAsDataURL(file);
 });
 
-[targetWidthInput, targetHeightInput, overlapInput].forEach(i => i.addEventListener('input', syncUI));
+[targetWidthInput, targetHeightInput, overlapInput].forEach(el => el.addEventListener('input', syncUI));
 
 generateBtn.addEventListener('click', async () => {
     if (!currentFile || !movableImage.src) return;
     generateBtn.disabled = true;
-    generateBtn.innerText = "COSTRUZIONE...";
+    generateBtn.innerText = "COSTRUZIONE PDF...";
     
-    const wMm = Number(targetWidthInput.value);
-    const hMm = Number(targetHeightInput.value);
-    const config = {
+    const config: PosterConfig = {
         imageWidthPx: movableImage.naturalWidth,
         imageHeightPx: movableImage.naturalHeight,
-        targetWidthMm: wMm,
-        targetHeightMm: hMm,
+        targetWidthMm: Number(targetWidthInput.value),
+        targetHeightMm: Number(targetHeightInput.value),
         overlapMm: Number(overlapInput.value),
         safeMarginMm: 5
     };
 
     const grid = calculateGrid(config);
-    // Passiamo le trasformazioni (scale, x, y) convertite in mm per il PDF
-    const pdfBytes = await generatePdf(currentFile, config, grid, {
-        scale: imgState.scale * 2, // Riportiamo alla scala mm reale
-        x: imgState.x * 2,
-        y: imgState.y * 2
-    });
+    const pdfBytes = await generatePdf(currentFile, config, grid, { ...imgState, viewScale: VIEW_SCALE });
 
     const blob = new Blob([pdfBytes as any], { type: 'application/pdf' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = 'Poster_Chirurgico.pdf'; a.click();
+    a.href = url;
+    a.download = 'Poster_Ritagliato.pdf';
+    a.click();
     
     generateBtn.disabled = false;
-    generateBtn.innerText = "Costruisci & Scarica PDF";
+    generateBtn.innerText = "Scarica PDF Ritagliato";
 });
