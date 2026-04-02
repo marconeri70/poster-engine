@@ -24,33 +24,32 @@ export async function generatePdf(
     const p = pages[i];
     const page = pdfDoc.addPage([A4_W_PT, A4_H_PT]);
     
-    // 1. FORZIAMO SFONDO BIANCO
-    page.drawRectangle({
-      x: 0, y: 0, width: A4_W_PT, height: A4_H_PT,
-      color: rgb(1, 1, 1)
-    });
-
     const dW = p.destWidthMm * MM_TO_PT;
     const dH = p.destHeightMm * MM_TO_PT;
     const offX = (A4_W_PT - dW) / 2;
     const offY = (A4_H_PT - dH) / 2;
 
-    // 2. RITAGLIO (CLIPPING)
-    page.pushOperators();
-    page.drawRectangle({ x: offX, y: offY, width: dW, height: dH });
-    page.clip();
-
+    // 1. DISEGNO IMMAGINE (L'immagine potrebbe sbordare oltre i margini)
     page.drawImage(pdfImage, {
       x: offX + (imgState.x * MM_TO_PT) - (p.sourceX * (config.targetWidthMm / config.imageWidthPx) * MM_TO_PT),
       y: (A4_H_PT - offY) - (imgState.h * MM_TO_PT) - (imgState.y * MM_TO_PT) + (p.sourceY * (config.targetHeightMm / config.imageHeightPx) * MM_TO_PT),
       width: imgState.w * MM_TO_PT,
       height: imgState.h * MM_TO_PT,
     });
-    page.popOperators();
+
+    // 2. MASCHERAMENTO (Copriamo gli sbordi con blocchi bianchi assoluti)
+    const white = rgb(1, 1, 1);
+    // Bordo Sinistro
+    page.drawRectangle({ x: 0, y: 0, width: offX, height: A4_H_PT, color: white });
+    // Bordo Destro
+    page.drawRectangle({ x: offX + dW, y: 0, width: A4_W_PT - (offX + dW), height: A4_H_PT, color: white });
+    // Bordo Inferiore
+    page.drawRectangle({ x: 0, y: 0, width: A4_W_PT, height: offY, color: white });
+    // Bordo Superiore
+    page.drawRectangle({ x: 0, y: offY + dH, width: A4_W_PT, height: A4_H_PT - (offY + dH), color: white });
 
     // 3. LINEE DI TAGLIO ALTA VISIBILITÀ (Verde Neon)
     const neonGreen = rgb(0, 1, 0.4); 
-    
     page.drawRectangle({
       x: offX,
       y: offY,
@@ -60,7 +59,7 @@ export async function generatePdf(
       borderWidth: 2,
     });
 
-    // 4. TESTI DI SERVIZIO FUORI DALL'IMMAGINE
+    // 4. TESTI DI SERVIZIO FUORI DALL'IMMAGINE (Sul margine bianco appena creato)
     page.drawText(`FOGLIO ${i + 1} - Riga ${p.row + 1} Col ${p.col + 1}`, {
       x: offX,
       y: offY + dH + 10,
