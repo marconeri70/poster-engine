@@ -2,29 +2,44 @@
 <html lang="it">
 <head>
     <meta charset="UTF-8">
-    <title>3D Pen Template Creator</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Pen Edge Creator</title>
     <style>
         :root { --accent: #00ff88; --bg: #0a0a0a; }
-        body { font-family: sans-serif; background: var(--bg); color: white; display: flex; flex-direction: column; height: 100vh; margin: 0; }
-        .toolbar { padding: 20px; background: #1a1a1a; display: flex; gap: 20px; align-items: center; border-bottom: 1px solid #333; }
-        .canvas-container { flex-grow: 1; display: flex; align-items: center; justify-content: center; overflow: auto; padding: 20px; }
-        canvas { background: white; box-shadow: 0 0 30px rgba(0,0,0,0.5); max-width: 100%; }
+        body { font-family: sans-serif; background: var(--bg); color: white; margin: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+        .toolbar { padding: 15px; background: #1a1a1a; display: flex; gap: 20px; align-items: center; border-bottom: 1px solid #333; flex-wrap: wrap; z-index: 100; }
+        .control { display: flex; flex-direction: column; gap: 5px; }
+        label { font-size: 10px; text-transform: uppercase; color: #888; }
         .btn { padding: 10px 20px; background: var(--accent); color: black; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        
+        .main-view { flex-grow: 1; position: relative; background: #000; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+        #drawingBoard { position: relative; transform-origin: center; display: flex; align-items: center; justify-content: center; }
+        canvas { background: white; box-shadow: 0 0 50px rgba(0,0,0,0.8); }
         input[type="range"] { accent-color: var(--accent); }
     </style>
 </head>
 <body>
     <div class="toolbar">
-        <input type="file" id="upload" accept="image/*">
-        <div>
-            <label>Dettaglio Linee</label>
-            <input type="range" id="threshold" min="0" max="255" value="128">
+        <div class="control">
+            <label>1. Carica Foto</label>
+            <input type="file" id="upload" accept="image/*">
+        </div>
+        <div class="control">
+            <label>🔍 Zoom Tavolo</label>
+            <input type="range" id="zoomBoard" min="0.1" max="2" step="0.1" value="0.5">
+        </div>
+        <div class="control">
+            <label>Sensibilità Tratti (Penna 3D)</label>
+            <input type="range" id="threshold" min="5" max="100" value="30">
         </div>
         <button class="btn" id="saveBtn">Salva PNG per Poster</button>
-        <a href="index.html" style="color: #888; text-decoration: none; font-size: 12px;">← Torna al Poster Engine</a>
+        <a href="/poster-engine/index.html" style="color: var(--accent); text-decoration: none; font-size: 12px; margin-left: auto;">← Torna al Poster Engine</a>
     </div>
-    <div class="canvas-container">
-        <canvas id="canvas"></canvas>
+
+    <div class="main-view" id="viewport">
+        <div id="drawingBoard">
+            <canvas id="canvas"></canvas>
+        </div>
     </div>
 
     <script>
@@ -32,6 +47,8 @@
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
         const threshold = document.getElementById('threshold');
+        const zoomBoard = document.getElementById('zoomBoard');
+        const drawingBoard = document.getElementById('drawingBoard');
         let originalImage = null;
 
         upload.addEventListener('change', (e) => {
@@ -50,6 +67,11 @@
             reader.readAsDataURL(file);
         });
 
+        function updateZoom() {
+            drawingBoard.style.transform = `scale(${zoomBoard.value})`;
+        }
+
+        zoomBoard.addEventListener('input', updateZoom);
         threshold.addEventListener('input', processImage);
 
         function processImage() {
@@ -57,21 +79,45 @@
             ctx.drawImage(originalImage, 0, 0);
             const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
             const data = imageData.data;
-            const thresh = threshold.value;
+            const w = canvas.width;
+            const h = canvas.height;
+            const thresh = parseInt(threshold.value);
 
+            // 1. Crea mappa scala di grigi
+            const gray = new Uint8ClampedArray(w * h);
             for (let i = 0; i < data.length; i += 4) {
-                // Conversione in scala di grigi (Luminanza)
-                const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
-                // Effetto soglia (Bianco o Nero)
-                const val = avg > thresh ? 255 : 0;
-                data[i] = data[i+1] = data[i+2] = val;
+                gray[i / 4] = (data[i] + data[i + 1] + data[i + 2]) / 3;
+            }
+
+            // 2. Rilevamento Bordi (Edge Detection)
+            for (let y = 0; y < h; y++) {
+                for (let x = 0; x < w; x++) {
+                    const idx = y * w + x;
+                    const pixelIdx = idx * 4;
+                    
+                    let isEdge = 255; // Default Bianco
+                    
+                    if (x < w - 1 && y < h - 1) {
+                        const diffX = Math.abs(gray[idx] - gray[idx + 1]);
+                        const diffY = Math.abs(gray[idx] - gray[idx + w]);
+                        // Se la differenza tra pixel vicini è alta, è un bordo
+                        if (diffX > thresh || diffY > thresh) {
+                            isEdge = 0; // Nero (Tratto Penna)
+                        }
+                    }
+
+                    data[pixelIdx] = data[pixelIdx + 1] = data[pixelIdx + 2] = isEdge;
+                    data[pixelIdx + 3] = 255;
+                }
             }
             ctx.putImageData(imageData, 0, 0);
+            updateZoom();
         }
 
         document.getElementById('saveBtn').addEventListener('click', () => {
+            if(!originalImage) return;
             const link = document.createElement('a');
-            link.download = 'template-3d-pen.png';
+            link.download = 'tratti-penna-3d.png';
             link.href = canvas.toDataURL();
             link.click();
         });
