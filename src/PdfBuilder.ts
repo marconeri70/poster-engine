@@ -11,20 +11,11 @@ export async function generatePdf(
 ): Promise<Uint8Array> {
   const pdfDoc = await PDFDocument.create();
   const font = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-
-  // LOGICA DI COMPATIBILITÀ UNIVERSALE (WEBP, JPG, PNG)
-  // Creiamo un canvas invisibile per convertire qualsiasi immagine in JPG prima di inserirla nel PDF
-  const imgBitmap = await createImageBitmap(file);
-  const canvas = document.createElement('canvas');
-  canvas.width = imgBitmap.width;
-  canvas.height = imgBitmap.height;
-  const ctx = canvas.getContext('2d');
-  ctx?.drawImage(imgBitmap, 0, 0);
+  const imageBytes = await file.arrayBuffer();
   
-  // Convertiamo in JPEG ad alta qualità (0.95) per supportare i file WEBP
-  const jpgUrl = canvas.toDataURL('image/jpeg', 0.95);
-  const jpgBytes = await fetch(jpgUrl).then(res => res.arrayBuffer());
-  const pdfImage = await pdfDoc.embedJpg(jpgBytes);
+  const pdfImage = file.type === 'image/png' ? 
+                 await pdfDoc.embedPng(imageBytes) : 
+                 await pdfDoc.embedJpg(imageBytes);
 
   const A4_W_PT = 210 * MM_TO_PT;
   const A4_H_PT = 297 * MM_TO_PT;
@@ -32,10 +23,22 @@ export async function generatePdf(
   for (let i = 0; i < pages.length; i++) {
     const p = pages[i];
     const page = pdfDoc.addPage([A4_W_PT, A4_H_PT]);
+    
+    // Forza sfondo bianco su tutta la pagina
+    page.drawRectangle({
+      x: 0, y: 0, width: A4_W_PT, height: A4_H_PT,
+      color: rgb(1, 1, 1)
+    });
+
     const dW = p.destWidthMm * MM_TO_PT;
     const dH = p.destHeightMm * MM_TO_PT;
     const offX = (A4_W_PT - dW) / 2;
     const offY = (A4_H_PT - dH) / 2;
+
+    // Disegno dell'immagine con ritaglio preciso
+    page.pushOperators();
+    page.drawRectangle({ x: offX, y: offY, width: dW, height: dH, color: rgb(1, 1, 1) });
+    page.clip();
 
     page.drawImage(pdfImage, {
       x: offX + (imgState.x * MM_TO_PT) - (p.sourceX * (config.targetWidthMm / config.imageWidthPx) * MM_TO_PT),
@@ -43,10 +46,35 @@ export async function generatePdf(
       width: imgState.w * MM_TO_PT,
       height: imgState.h * MM_TO_PT,
     });
+    page.popOperators();
 
-    page.drawRectangle({ x: offX, y: offY, width: dW, height: dH, borderColor: rgb(1, 0, 0), borderWidth: 1.5, borderDashArray: [2, 2] });
-    const label = `FOGLIO ${i + 1} [R:${p.row + 1} C:${p.col + 1}]`;
-    page.drawText(label, { x: offX + 15, y: offY + 15, size: 10, font: font, color: rgb(0, 1, 0.5) });
+    // LINEE DI TAGLIO ALTA VISIBILITÀ (Verde Fluo)
+    const strokeColor = rgb(0, 1, 0.5); 
+    page.drawRectangle({
+      x: offX, y: offY, width: dW, height: dH,
+      borderWidth: 1.5,
+      borderColor: strokeColor,
+    });
+
+    // ETICHETTA DI POSIZIONAMENTO
+    page.drawText(`FOGLIO: Riga ${p.row + 1} - Colonna ${p.col + 1}`, {
+      x: offX + 5,
+      y: offY + dH + 10,
+      size: 10,
+      font: font,
+      color: rgb(0, 0, 0),
+    });
+
+    // Indicatori di sovrapposizione (Overlap)
+    if (config.overlapMm > 0) {
+      page.drawText(`SOVRAPPOSIZIONE: ${config.overlapMm}mm`, {
+        x: offX + dW - 120,
+        y: offY - 15,
+        size: 8,
+        color: rgb(0.5, 0.5, 0.5),
+      });
+    }
   }
+
   return await pdfDoc.save();
 }
