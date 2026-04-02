@@ -22,7 +22,6 @@ let currentFile: File | null = null;
 function syncUI() {
     const wMm = Number(targetWidthInput.value);
     const hMm = Number(targetHeightInput.value);
-    
     posterFrame.style.width = `${wMm}px`;
     posterFrame.style.height = `${hMm}px`;
 
@@ -45,7 +44,7 @@ function syncUI() {
 }
 
 function updateVisuals() {
-    drawingBoard.style.transform = `scale(${zoomBoard.value})`;
+    if (drawingBoard) drawingBoard.style.transform = `scale(${zoomBoard.value})`;
     imageWrapper.style.left = `${mmState.x}px`;
     imageWrapper.style.top = `${mmState.y}px`;
     imageWrapper.style.width = `${mmState.w}px`;
@@ -56,18 +55,15 @@ const onStart = (e: MouseEvent | TouchEvent) => {
     const clientX = 'touches' in e ? e.touches[0].clientX : (e as MouseEvent).clientX;
     const clientY = 'touches' in e ? e.touches[0].clientY : (e as MouseEvent).clientY;
     const target = e.target as HTMLElement;
-    
     isInteracting = true;
     currentHandle = target.getAttribute('data-h');
     start = { mx: clientX, my: clientY, ix: mmState.x, iy: mmState.y, iw: mmState.w, ih: mmState.h };
-    e.stopPropagation();
 };
 
 const onMove = (e: MouseEvent | TouchEvent) => {
     if (!isInteracting) return;
     const clientX = 'touches' in e ? e.touches[0].clientX : (e as MouseEvent).clientX;
     const clientY = 'touches' in e ? e.touches[0].clientY : (e as MouseEvent).clientY;
-    
     const boardZoom = Number(zoomBoard.value);
     const dx = (clientX - start.mx) / boardZoom;
     const dy = (clientY - start.my) / boardZoom;
@@ -90,7 +86,6 @@ window.addEventListener('mousemove', onMove);
 window.addEventListener('touchmove', onMove, {passive: false});
 window.addEventListener('mouseup', () => isInteracting = false);
 window.addEventListener('touchend', () => isInteracting = false);
-
 zoomBoard.addEventListener('input', updateVisuals);
 
 imageInput.addEventListener('change', (e) => {
@@ -124,7 +119,7 @@ generateBtn.addEventListener('click', async () => {
     const pdfBytes = await generatePdf(currentFile, config, grid, mmState);
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([pdfBytes as any], { type: 'application/pdf' }));
-    a.download = 'Poster_Elite_v6.pdf';
+    a.download = 'Poster_Pro_v6.pdf';
     a.click();
     generateBtn.disabled = false;
     generateBtn.innerText = "Esporta PDF Finale";
