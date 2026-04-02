@@ -2,63 +2,42 @@
 <html lang="it">
 <head>
     <meta charset="UTF-8">
-    <title>3D Pen - Filament Line Art</title>
+    <title>3D Pen - Crosshatch Filament</title>
     <style>
         :root { --accent: #00ff88; --bg: #0a0a0a; }
         body { font-family: sans-serif; background: var(--bg); color: white; margin: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
         .toolbar { padding: 15px; background: #1a1a1a; display: flex; gap: 15px; align-items: center; border-bottom: 1px solid #333; z-index: 100; flex-wrap: wrap; }
         .control { display: flex; flex-direction: column; gap: 4px; }
         label { font-size: 9px; text-transform: uppercase; color: #888; letter-spacing: 1px; }
-        .btn { padding: 10px 20px; background: var(--accent); color: black; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; text-transform: uppercase; font-size: 12px; }
-        .btn:hover { opacity: 0.8; }
-        
+        .btn { padding: 10px 20px; background: var(--accent); color: black; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; text-transform: uppercase; font-size: 11px; }
         .main-view { flex-grow: 1; position: relative; background: #000; overflow: hidden; display: flex; align-items: center; justify-content: center; }
         #drawingBoard { position: relative; transform-origin: center; box-shadow: 0 0 50px rgba(0,0,0,0.8); }
         canvas { background: white; display: block; }
-        
-        input[type="range"] { accent-color: var(--accent); width: 120px; cursor: pointer; }
-        input[type="file"] { font-size: 12px; color: #888; }
+        input[type="range"] { accent-color: var(--accent); width: 100px; cursor: pointer; }
     </style>
 </head>
 <body>
     <div class="toolbar">
-        <div class="control">
-            <label>1. Carica Foto</label>
-            <input type="file" id="upload" accept="image/*">
-        </div>
-        <div class="control">
-            <label>🔍 Zoom Vista</label>
-            <input type="range" id="zoomBoard" min="0.1" max="2" step="0.1" value="0.7">
-        </div>
-        <div class="control">
-            <label>Densità Linee (Spaziatura)</label>
-            <input type="range" id="lineSpacing" min="2" max="20" value="6">
-        </div>
-        <div class="control">
-            <label>Spessore Tratto (Filamento)</label>
-            <input type="range" id="lineWidth" min="1" max="8" value="3">
-        </div>
-        <button class="btn" id="saveBtn">Salva Tracciato Filamento</button>
-        <a href="/poster-engine/index.html" style="color: var(--accent); text-decoration: none; font-size: 11px; margin-left: auto; font-weight: bold;">← Torna al Poster Engine</a>
+        <div class="control"><label>1. Carica Foto</label><input type="file" id="upload" accept="image/*"></div>
+        <div class="control"><label>🔍 Zoom</label><input type="range" id="zoomBoard" min="0.1" max="2" step="0.1" value="0.7"></div>
+        <div class="control"><label>Spaziatura</label><input type="range" id="lineSpacing" min="3" max="25" value="8"></div>
+        <div class="control"><label>Dettaglio</label><input type="range" id="detail" min="50" max="200" value="130"></div>
+        <button class="btn" id="saveBtn">Salva per Penna 3D</button>
+        <a href="/poster-engine/index.html" style="color: var(--accent); text-decoration: none; font-size: 10px; margin-left: auto;">← Poster Engine</a>
     </div>
 
-    <div class="main-view">
-        <div id="drawingBoard">
-            <canvas id="canvas"></canvas>
-        </div>
-    </div>
+    <div class="main-view"><div id="drawingBoard"><canvas id="canvas"></canvas></div></div>
 
     <script>
         const upload = document.getElementById('upload');
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d', { willReadFrequently: true });
         const lineSpacingInput = document.getElementById('lineSpacing');
-        const lineWidthInput = document.getElementById('lineWidth');
+        const detailInput = document.getElementById('detail');
         const zoomBoard = document.getElementById('zoomBoard');
         const drawingBoard = document.getElementById('drawingBoard');
         let originalImage = null;
 
-        // Gestione Caricamento Immagine
         upload.addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (!file) return;
@@ -67,9 +46,7 @@
                 const img = new Image();
                 img.onload = () => {
                     originalImage = img;
-                    // Impostiamo dimensioni canvas basate sull'immagine
-                    canvas.width = img.width;
-                    canvas.height = img.height;
+                    canvas.width = img.width; canvas.height = img.height;
                     processImage();
                 };
                 img.src = event.target.result;
@@ -77,74 +54,65 @@
             reader.readAsDataURL(file);
         });
 
-        // Gestione Zoom e Controlli
         const updateZoom = () => drawingBoard.style.transform = `scale(${zoomBoard.value})`;
         zoomBoard.addEventListener('input', updateZoom);
-        lineSpacingInput.addEventListener('input', processImage);
-        lineWidthInput.addEventListener('input', processImage);
+        [lineSpacingInput, detailInput].forEach(el => el.addEventListener('input', processImage));
 
-        // ALGORITMO CORE: Trasformazione in Linee di Filamento
         function processImage() {
             if (!originalImage) return;
-
-            // 1. Prepariamo l'immagine in scala di grigi sfocata per pulire il rumore
             const tempCanvas = document.createElement('canvas');
-            tempCanvas.width = canvas.width;
-            tempCanvas.height = canvas.height;
+            tempCanvas.width = canvas.width; tempCanvas.height = canvas.height;
             const tempCtx = tempCanvas.getContext('2d');
-            tempCtx.filter = "grayscale(100%) blur(1px)";
+            tempCtx.filter = "grayscale(100%) contrast(150%) blur(1px)";
             tempCtx.drawImage(originalImage, 0, 0);
             
             const imageData = tempCtx.getImageData(0, 0, canvas.width, canvas.height);
             const data = imageData.data;
-            const w = canvas.width;
-            const h = canvas.height;
+            const w = canvas.width; const h = canvas.height;
 
-            // 2. Puliamo il canvas principale (sfondo bianco)
             ctx.fillStyle = "white";
             ctx.fillRect(0, 0, w, h);
-
-            // 3. Impostiamo lo stile del filamento (nero)
             ctx.strokeStyle = "black";
-            ctx.lineWidth = parseInt(lineWidthInput.value);
-            ctx.lineCap = "round";
+            ctx.lineWidth = 2;
             const spacing = parseInt(lineSpacingInput.value);
+            const threshold = parseInt(detailInput.value);
 
-            // 4. Generiamo il tracciato a scansione orizzontale
             ctx.beginPath();
+            // Passata Orizzontale
             for (let y = 0; y < h; y += spacing) {
-                let isDrawing = false;
-                
+                let startX = -1;
                 for (let x = 0; x < w; x++) {
-                    const idx = (y * w + x) * 4;
-                    // Luminosità del pixel (0 = nero, 255 = bianco)
-                    const brightness = data[idx]; 
-                    
-                    // Se il pixel è scuro (ombra), dobbiamo tracciare il filamento
-                    if (brightness < 128) {
-                        if (!isDrawing) {
-                            ctx.moveTo(x, y); // Inizio del tratto
-                            isDrawing = true;
-                        } else {
-                            ctx.lineTo(x, y); // Continuazione del tratto
-                        }
-                    } else {
-                        // Se il pixel è chiaro (luce), interrompiamo il tratto
-                        isDrawing = false; 
+                    const brightness = data[(y * w + x) * 4];
+                    if (brightness < threshold) {
+                        if (startX === -1) startX = x;
+                    } else if (startX !== -1) {
+                        if (x - startX > 3) { ctx.moveTo(startX, y); ctx.lineTo(x, y); }
+                        startX = -1;
                     }
                 }
             }
-            ctx.stroke(); // Disegniamo tutte le linee generate
+            // Passata Verticale (Crea la struttura a rete)
+            for (let x = 0; x < w; x += spacing) {
+                let startY = -1;
+                for (let y = 0; y < h; y++) {
+                    const brightness = data[(y * w + x) * 4];
+                    if (brightness < threshold) {
+                        if (startY === -1) startY = y;
+                    } else if (startY !== -1) {
+                        if (y - startY > 3) { ctx.moveTo(x, startY); ctx.lineTo(x, y); }
+                        startY = -1;
+                    }
+                }
+            }
+            ctx.stroke();
             updateZoom();
         }
 
-        // Salvataggio PNG
         document.getElementById('saveBtn').addEventListener('click', () => {
             if(!originalImage) return;
             const link = document.createElement('a');
-            link.download = 'tracciato_filamento_3d.png';
-            link.href = canvas.toDataURL('image/png');
-            link.click();
+            link.download = '3d_pen_mesh.png';
+            link.href = canvas.toDataURL(); link.click();
         });
     </script>
 </body>
