@@ -11,11 +11,20 @@ export async function generatePdf(
 ): Promise<Uint8Array> {
   const pdfDoc = await PDFDocument.create();
   const font = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-  const imageBytes = await file.arrayBuffer();
+
+  // LOGICA DI COMPATIBILITÀ UNIVERSALE (WEBP, JPG, PNG)
+  // Creiamo un canvas invisibile per convertire qualsiasi immagine in JPG prima di inserirla nel PDF
+  const imgBitmap = await createImageBitmap(file);
+  const canvas = document.createElement('canvas');
+  canvas.width = imgBitmap.width;
+  canvas.height = imgBitmap.height;
+  const ctx = canvas.getContext('2d');
+  ctx?.drawImage(imgBitmap, 0, 0);
   
-  const pdfImage = file.type === 'image/png' ? 
-                 await pdfDoc.embedPng(imageBytes) : 
-                 await pdfDoc.embedJpg(imageBytes);
+  // Convertiamo in JPEG ad alta qualità (0.95) per supportare i file WEBP
+  const jpgUrl = canvas.toDataURL('image/jpeg', 0.95);
+  const jpgBytes = await fetch(jpgUrl).then(res => res.arrayBuffer());
+  const pdfImage = await pdfDoc.embedJpg(jpgBytes);
 
   const A4_W_PT = 210 * MM_TO_PT;
   const A4_H_PT = 297 * MM_TO_PT;
@@ -35,10 +44,7 @@ export async function generatePdf(
       height: imgState.h * MM_TO_PT,
     });
 
-    // Cornice rossa di taglio
     page.drawRectangle({ x: offX, y: offY, width: dW, height: dH, borderColor: rgb(1, 0, 0), borderWidth: 1.5, borderDashArray: [2, 2] });
-    
-    // Info foglio protetta
     const label = `FOGLIO ${i + 1} [R:${p.row + 1} C:${p.col + 1}]`;
     page.drawText(label, { x: offX + 15, y: offY + 15, size: 10, font: font, color: rgb(0, 1, 0.5) });
   }
