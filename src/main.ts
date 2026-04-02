@@ -1,126 +1,88 @@
-import { calculateGrid, type PosterConfig } from './GridCalculator';
-import { generatePdf } from './PdfBuilder';
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <title>3D Pen - Filament Path Creator</title>
+    <style>
+        :root { --accent: #00ff88; --bg: #0a0a0a; }
+        body { font-family: sans-serif; background: var(--bg); color: white; margin: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+        .toolbar { padding: 15px; background: #1a1a1a; display: flex; gap: 20px; align-items: center; border-bottom: 1px solid #333; z-index: 100; }
+        .control { display: flex; flex-direction: column; gap: 5px; }
+        label { font-size: 10px; text-transform: uppercase; color: #888; }
+        .btn { padding: 10px 20px; background: var(--accent); color: black; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .main-view { flex-grow: 1; position: relative; background: #000; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+        #drawingBoard { position: relative; transform-origin: center; }
+        canvas { background: white; filter: contrast(1.4); }
+        input[type="range"] { accent-color: var(--accent); }
+    </style>
+</head>
+<body>
+    <div class="toolbar">
+        <div class="control"><label>1. Carica Foto</label><input type="file" id="upload" accept="image/*"></div>
+        <div class="control"><label>🔍 Zoom</label><input type="range" id="zoomBoard" min="0.1" max="2" step="0.1" value="0.6"></div>
+        <div class="control"><label>Sensibilità Filamento</label><input type="range" id="threshold" min="10" max="150" value="50"></div>
+        <button class="btn" id="saveBtn">Salva Tracciato</button>
+        <a href="/poster-engine/index.html" style="color: var(--accent); text-decoration: none; font-size: 11px; margin-left: auto;">← Poster Engine</a>
+    </div>
+    <div class="main-view"><div id="drawingBoard"><canvas id="canvas"></canvas></div></div>
+    <script>
+        const upload = document.getElementById('upload');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        const threshold = document.getElementById('threshold');
+        const zoomBoard = document.getElementById('zoomBoard');
+        const drawingBoard = document.getElementById('drawingBoard');
+        let originalImage = null;
 
-const imageInput = document.getElementById('imageInput') as HTMLInputElement;
-const targetWidthInput = document.getElementById('targetWidth') as HTMLInputElement;
-const targetHeightInput = document.getElementById('targetHeight') as HTMLInputElement;
-const overlapInput = document.getElementById('overlap') as HTMLInputElement;
-const zoomBoard = document.getElementById('zoomBoard') as HTMLInputElement;
-const generateBtn = document.getElementById('generateBtn') as HTMLButtonElement;
-const posterFrame = document.getElementById('posterFrame') as HTMLDivElement;
-const drawingBoard = document.getElementById('drawingBoard') as HTMLDivElement;
-const imageWrapper = document.getElementById('imageWrapper') as HTMLDivElement;
-const movableImage = document.getElementById('movableImage') as HTMLImageElement;
-const gridOverlay = document.getElementById('gridOverlay') as HTMLDivElement;
+        upload.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const img = new Image();
+                img.onload = () => {
+                    originalImage = img;
+                    canvas.width = img.width; canvas.height = img.height;
+                    processImage();
+                };
+                img.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+        });
 
-let mmState = { x: 0, y: 0, w: 1000, h: 1000 };
-let isInteracting = false;
-let currentHandle: string | null = null;
-let start = { mx: 0, my: 0, ix: 0, iy: 0, iw: 0, ih: 0 };
-let currentFile: File | null = null;
+        const updateZoom = () => drawingBoard.style.transform = `scale(${zoomBoard.value})`;
+        zoomBoard.addEventListener('input', updateZoom);
+        threshold.addEventListener('input', processImage);
 
-function syncUI() {
-    const wMm = Number(targetWidthInput.value);
-    const hMm = Number(targetHeightInput.value);
-    posterFrame.style.width = `${wMm}px`;
-    posterFrame.style.height = `${hMm}px`;
+        function processImage() {
+            if (!originalImage) return;
+            ctx.filter = "grayscale(100%) blur(1.5px)";
+            ctx.drawImage(originalImage, 0, 0);
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const data = imageData.data;
+            const w = canvas.width; const h = canvas.height;
+            const t = parseInt(threshold.value);
+            const output = new Uint8ClampedArray(data.length);
 
-    const config: PosterConfig = {
-        imageWidthPx: movableImage.naturalWidth || 100,
-        imageHeightPx: movableImage.naturalHeight || 100,
-        targetWidthMm: wMm, targetHeightMm: hMm,
-        overlapMm: Number(overlapInput.value), safeMarginMm: 10 
-    };
+            for (let y = 1; y < h - 1; y++) {
+                for (let x = 1; x < w - 1; x++) {
+                    const i = (y * w + x) * 4;
+                    const diff = Math.abs(data[i] - data[i+4]) + Math.abs(data[i] - data[i+(w*4)]);
+                    const val = diff > t ? 0 : 255;
+                    output[i] = output[i+1] = output[i+2] = val; output[i+3] = 255;
+                }
+            }
+            ctx.filter = "none";
+            imageData.data.set(output);
+            ctx.putImageData(imageData, 0, 0);
+            updateZoom();
+        }
 
-    const grid = calculateGrid(config);
-    gridOverlay.style.gridTemplateColumns = `repeat(${Math.max(...grid.map(g => g.col)) + 1}, 1fr)`;
-    gridOverlay.innerHTML = '';
-    grid.forEach(() => {
-        const line = document.createElement('div');
-        line.className = 'grid-line';
-        gridOverlay.appendChild(line);
-    });
-    updateVisuals();
-}
-
-function updateVisuals() {
-    if (drawingBoard) drawingBoard.style.transform = `scale(${zoomBoard.value})`;
-    imageWrapper.style.left = `${mmState.x}px`;
-    imageWrapper.style.top = `${mmState.y}px`;
-    imageWrapper.style.width = `${mmState.w}px`;
-    imageWrapper.style.height = `${mmState.h}px`;
-}
-
-const onStart = (e: MouseEvent | TouchEvent) => {
-    const clientX = 'touches' in e ? e.touches[0].clientX : (e as MouseEvent).clientX;
-    const clientY = 'touches' in e ? e.touches[0].clientY : (e as MouseEvent).clientY;
-    const target = e.target as HTMLElement;
-    isInteracting = true;
-    currentHandle = target.getAttribute('data-h');
-    start = { mx: clientX, my: clientY, ix: mmState.x, iy: mmState.y, iw: mmState.w, ih: mmState.h };
-};
-
-const onMove = (e: MouseEvent | TouchEvent) => {
-    if (!isInteracting) return;
-    const clientX = 'touches' in e ? e.touches[0].clientX : (e as MouseEvent).clientX;
-    const clientY = 'touches' in e ? e.touches[0].clientY : (e as MouseEvent).clientY;
-    const boardZoom = Number(zoomBoard.value);
-    const dx = (clientX - start.mx) / boardZoom;
-    const dy = (clientY - start.my) / boardZoom;
-
-    if (!currentHandle) {
-        mmState.x = start.ix + dx;
-        mmState.y = start.iy + dy;
-    } else {
-        if (currentHandle.includes('r')) mmState.w = Math.max(10, start.iw + dx);
-        if (currentHandle.includes('l')) { mmState.w = Math.max(10, start.iw - dx); mmState.x = start.ix + dx; }
-        if (currentHandle.includes('b')) mmState.h = Math.max(10, start.ih + dy);
-        if (currentHandle.includes('t')) { mmState.h = Math.max(10, start.ih - dy); mmState.y = start.iy + dy; }
-    }
-    updateVisuals();
-};
-
-imageWrapper.addEventListener('mousedown', onStart);
-imageWrapper.addEventListener('touchstart', onStart, {passive: false});
-window.addEventListener('mousemove', onMove);
-window.addEventListener('touchmove', onMove, {passive: false});
-window.addEventListener('mouseup', () => isInteracting = false);
-window.addEventListener('touchend', () => isInteracting = false);
-zoomBoard.addEventListener('input', updateVisuals);
-
-imageInput.addEventListener('change', (e) => {
-    const file = (e.target as HTMLInputElement).files?.[0];
-    if (!file) return;
-    currentFile = file;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-        movableImage.src = String(ev.target?.result);
-        imageWrapper.style.display = 'block';
-        movableImage.onload = () => {
-            mmState = { x: 0, y: 0, w: Number(targetWidthInput.value), h: Number(targetHeightInput.value) };
-            syncUI();
-        };
-    };
-    reader.readAsDataURL(file);
-});
-
-[targetWidthInput, targetHeightInput, overlapInput].forEach(el => el.addEventListener('input', syncUI));
-
-generateBtn.addEventListener('click', async () => {
-    if (!currentFile || !movableImage.src) return;
-    generateBtn.disabled = true;
-    generateBtn.innerText = "COSTRUZIONE PDF...";
-    const config = {
-        imageWidthPx: movableImage.naturalWidth, imageHeightPx: movableImage.naturalHeight,
-        targetWidthMm: Number(targetWidthInput.value), targetHeightMm: Number(targetHeightInput.value),
-        overlapMm: Number(overlapInput.value), safeMarginMm: 10
-    };
-    const grid = calculateGrid(config);
-    const pdfBytes = await generatePdf(currentFile, config, grid, mmState);
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([pdfBytes as any], { type: 'application/pdf' }));
-    a.download = 'Poster_Pro_v6.pdf';
-    a.click();
-    generateBtn.disabled = false;
-    generateBtn.innerText = "Esporta PDF Finale";
-});
+        document.getElementById('saveBtn').addEventListener('click', () => {
+            if(!originalImage) return;
+            const link = document.createElement('a');
+            link.download = 'stencil_penna_3d.png';
+            link.href = canvas.toDataURL(); link.click();
+        });
+    </script>
+</body>
+</html>
