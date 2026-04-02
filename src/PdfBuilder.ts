@@ -35,13 +35,10 @@ export async function generatePdf(
       height: imgState.h * MM_TO_PT,
     });
 
-    // Taglio Rosso (Safe Zone)
+    // Cornice rossa di taglio
     page.drawRectangle({ x: offX, y: offY, width: dW, height: dH, borderColor: rgb(1, 0, 0), borderWidth: 1.5, borderDashArray: [2, 2] });
     
-    // Colla Blu
-    if (p.col > 0) page.drawRectangle({ x: offX, y: offY, width: config.overlapMm * MM_TO_PT, height: dH, color: rgb(0, 0.4, 1), opacity: 0.15 });
-
-    // Numerazione Protetta Interna
+    // Info foglio protetta
     const label = `FOGLIO ${i + 1} [R:${p.row + 1} C:${p.col + 1}]`;
     page.drawText(label, { x: offX + 15, y: offY + 15, size: 10, font: font, color: rgb(0, 1, 0.5) });
   }
