@@ -11,11 +11,17 @@ export async function generatePdf(
 ): Promise<Uint8Array> {
   const pdfDoc = await PDFDocument.create();
   const font = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-  const imageBytes = await file.arrayBuffer();
   
-  const pdfImage = file.type === 'image/png' ? 
-                 await pdfDoc.embedPng(imageBytes) : 
-                 await pdfDoc.embedJpg(imageBytes);
+  // MOTORE DI CONVERSIONE UNIVERSALE (Blindatura contro i formati WebP/AVIF)
+  const imgBitmap = await createImageBitmap(file);
+  const canvas = document.createElement('canvas');
+  canvas.width = imgBitmap.width;
+  canvas.height = imgBitmap.height;
+  const ctx = canvas.getContext('2d');
+  ctx?.drawImage(imgBitmap, 0, 0);
+  const jpgUrl = canvas.toDataURL('image/jpeg', 0.95);
+  const jpgBytes = await fetch(jpgUrl).then(res => res.arrayBuffer());
+  const pdfImage = await pdfDoc.embedJpg(jpgBytes);
 
   const A4_W_PT = 210 * MM_TO_PT;
   const A4_H_PT = 297 * MM_TO_PT;
@@ -37,19 +43,18 @@ export async function generatePdf(
       height: imgState.h * MM_TO_PT,
     });
 
-    // 2. MASCHERE BIANCHE ESTERNE (Nascondono tutto ciò che esce dal quadrato da ritagliare)
+    // 2. MASCHERE BIANCHE ESTERNE
     const white = rgb(1, 1, 1);
-    page.drawRectangle({ x: 0, y: 0, width: offX, height: A4_H_PT, color: white }); // Maschera Sinistra
-    page.drawRectangle({ x: offX + dW, y: 0, width: A4_W_PT - (offX + dW), height: A4_H_PT, color: white }); // Maschera Destra
-    page.drawRectangle({ x: 0, y: 0, width: A4_W_PT, height: offY, color: white }); // Maschera Sotto
-    page.drawRectangle({ x: 0, y: offY + dH, width: A4_W_PT, height: A4_H_PT - (offY + dH), color: white }); // Maschera Sopra
+    page.drawRectangle({ x: 0, y: 0, width: offX, height: A4_H_PT, color: white });
+    page.drawRectangle({ x: offX + dW, y: 0, width: A4_W_PT - (offX + dW), height: A4_H_PT, color: white });
+    page.drawRectangle({ x: 0, y: 0, width: A4_W_PT, height: offY, color: white });
+    page.drawRectangle({ x: 0, y: offY + dH, width: A4_W_PT, height: A4_H_PT - (offY + dH), color: white });
 
-    // 3. LINGUETTE "ZONA COLLA" (Blocchi grigi che coprono il disegno dove andrà la colla)
+    // 3. LINGUETTE "ZONA COLLA"
     const overlapPt = config.overlapMm * MM_TO_PT;
-    const glueColor = rgb(0.9, 0.9, 0.9); // Grigio chiaro
+    const glueColor = rgb(0.9, 0.9, 0.9);
     const textColor = rgb(0.4, 0.4, 0.4);
 
-    // Linguetta Sinistra (Se c'è una colonna precedente)
     if (config.overlapMm > 0 && p.col > 0) {
       page.drawRectangle({
         x: offX, y: offY, width: overlapPt, height: dH, color: glueColor
@@ -59,7 +64,6 @@ export async function generatePdf(
       });
     }
 
-    // Linguetta Superiore (Se c'è una riga precedente)
     if (config.overlapMm > 0 && p.row > 0) {
       page.drawRectangle({
         x: offX, y: offY + dH - overlapPt, width: dW, height: overlapPt, color: glueColor
@@ -69,14 +73,14 @@ export async function generatePdf(
       });
     }
 
-    // 4. LINEA DI TAGLIO (Bordo nero tratteggiato)
+    // 4. LINEA DI TAGLIO
     page.drawRectangle({
       x: offX, y: offY, width: dW, height: dH,
       borderColor: rgb(0, 0, 0), borderWidth: 1, borderDashArray: [4, 4]
     });
 
-    // 5. ISTRUZIONI DI ASSEMBLAGGIO (Fuori dal quadrato)
-    page.drawText(`✂️ TAGLIA LUNGO LA LINEA TRATTEGGIATA`, {
+    // 5. ISTRUZIONI DI ASSEMBLAGGIO (Senza Emoji)
+    page.drawText(`[ TAGLIA LUNGO LA LINEA TRATTEGGIATA ]`, {
       x: offX, y: offY - 12, size: 8, font: font, color: rgb(0, 0, 0)
     });
     
