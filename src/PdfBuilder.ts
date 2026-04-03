@@ -35,7 +35,7 @@ export async function generatePdf(
     const offX = (A4_W_PT - dW) / 2;
     const offY = (A4_H_PT - dH) / 2;
 
-    // 1. DISEGNO IMMAGINE (Identico al tuo originale)
+    // 1. DISEGNO IMMAGINE (Identico all'originale)
     page.drawImage(pdfImage, {
       x: offX + (imgState.x * MM_TO_PT) - (p.sourceX * (config.targetWidthMm / config.imageWidthPx) * MM_TO_PT),
       y: (A4_H_PT - offY) - (imgState.h * MM_TO_PT) - (imgState.y * MM_TO_PT) + (p.sourceY * (config.targetHeightMm / config.imageHeightPx) * MM_TO_PT),
@@ -43,42 +43,50 @@ export async function generatePdf(
       height: imgState.h * MM_TO_PT,
     });
 
-    // MASCHERAMENTO BIANCO ESTERNO (Evita che l'immagine sporchi l'intero foglio A4)
+    // 2. MASCHERAMENTO BIANCO ESTERNO
     const white = rgb(1, 1, 1);
     page.drawRectangle({ x: 0, y: 0, width: offX, height: A4_H_PT, color: white });
     page.drawRectangle({ x: offX + dW, y: 0, width: A4_W_PT - (offX + dW), height: A4_H_PT, color: white });
     page.drawRectangle({ x: 0, y: 0, width: A4_W_PT, height: offY, color: white });
     page.drawRectangle({ x: 0, y: offY + dH, width: A4_W_PT, height: A4_H_PT - (offY + dH), color: white });
 
-    // 2. CORNICE ORIGINALE ROSSA (Usa questa per RITAGLIARE)
+    // 3. NUOVO SISTEMA: LINGUETTE DI COLLA ESTERNE (Non coprono l'immagine)
+    const overlapPt = config.overlapMm * MM_TO_PT;
+    const glueColor = rgb(0.9, 0.9, 0.9);
+    const blue = rgb(0, 0.5, 1);
+
+    // Linguetta a SINISTRA (Esterna al box rosso)
+    if (config.overlapMm > 0 && p.col > 0) {
+      const startX = Math.max(0, offX - overlapPt);
+      const flapWidth = offX - startX;
+      
+      page.drawRectangle({ x: startX, y: offY, width: flapWidth, height: dH, color: glueColor });
+      page.drawLine({
+        start: { x: startX, y: offY }, end: { x: startX, y: offY + dH },
+        thickness: 1, color: blue, dashArray: [3, 3]
+      });
+      page.drawText("COLLA", { x: startX + 2, y: offY + dH / 2, size: 7, font: font, color: blue });
+    }
+
+    // Linguetta in ALTO (Esterna al box rosso)
+    if (config.overlapMm > 0 && p.row > 0) {
+      const flapHeight = Math.min(overlapPt, A4_H_PT - (offY + dH));
+      
+      page.drawRectangle({ x: offX, y: offY + dH, width: dW, height: flapHeight, color: glueColor });
+      page.drawLine({
+        start: { x: offX, y: offY + dH + flapHeight }, end: { x: offX + dW, y: offY + dH + flapHeight },
+        thickness: 1, color: blue, dashArray: [3, 3]
+      });
+      page.drawText("COLLA", { x: offX + dW / 2 - 15, y: offY + dH + 2, size: 7, font: font, color: blue });
+    }
+
+    // 4. CORNICE ROSSA ORIGINALE (Delimita l'immagine pura)
     page.drawRectangle({ 
       x: offX, y: offY, width: dW, height: dH, 
       borderColor: rgb(1, 0, 0), borderWidth: 1.5, borderDashArray: [2, 2] 
     });
 
-    // 3. NUOVA AGGIUNTA: LINEE BLU DI SOVRAPPOSIZIONE
-    const overlapPt = config.overlapMm * MM_TO_PT;
-    const blue = rgb(0, 0.4, 1); // Colore a contrasto
-
-    // Se c'è una colonna precedente, disegna la guida di sovrapposizione a SINISTRA
-    if (config.overlapMm > 0 && p.col > 0) {
-      page.drawLine({
-        start: { x: offX + overlapPt, y: offY },
-        end: { x: offX + overlapPt, y: offY + dH },
-        thickness: 1.5, color: blue, dashArray: [4, 4]
-      });
-    }
-
-    // Se c'è una riga precedente, disegna la guida di sovrapposizione in ALTO
-    if (config.overlapMm > 0 && p.row > 0) {
-      page.drawLine({
-        start: { x: offX, y: offY + dH - overlapPt },
-        end: { x: offX + dW, y: offY + dH - overlapPt },
-        thickness: 1.5, color: blue, dashArray: [4, 4]
-      });
-    }
-
-    // 4. TESTO ORIGINALE (Identico al tuo)
+    // 5. TESTO ORIGINALE
     const label = `FOGLIO ${i + 1} [R:${p.row + 1} C:${p.col + 1}]`;
     page.drawText(label, { x: offX + 15, y: offY + 15, size: 10, font: font, color: rgb(0, 1, 0.5) });
   }
